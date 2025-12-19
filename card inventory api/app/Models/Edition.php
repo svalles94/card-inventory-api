@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Card extends Model
+class Edition extends Model
 {
     use HasFactory;
 
@@ -45,31 +46,26 @@ class Card extends Model
      */
     protected $fillable = [
         'id',
-        'name',
-        'slug',
-        'image',
-        'image_filename',
-        'cost_memory',
-        'cost_reserve',
-        'durability',
-        'power',
-        'life',
-        'level',
-        'speed',
+        'card_id',
+        'set_id',
+        'collector_number',
+        'configuration',
         'effect',
-        'effect_raw',
         'effect_html',
+        'effect_raw',
         'flavor',
         'illustrator',
-        'types',
-        'subtypes',
-        'classes',
-        'elements',
-        'rule',
-        'referenced_by',
-        'references',
+        'orientation',
+        'other_orientations',
+        'image',
         'rarity',
-        'legality',
+        'slug',
+        'tcgplayer_product_id',
+        'tcgplayer_sku',
+        'market_price',
+        'tcgplayer_low_price',
+        'tcgplayer_high_price',
+        'last_price_update',
         'created_at',
         'last_update',
     ];
@@ -82,36 +78,36 @@ class Card extends Model
     protected function casts(): array
     {
         return [
-            'types' => 'array',
-            'subtypes' => 'array',
-            'classes' => 'array',
-            'elements' => 'array',
-            'rule' => 'array',
-            'referenced_by' => 'array',
-            'references' => 'array',
-            'cost_memory' => 'integer',
-            'cost_reserve' => 'integer',
-            'durability' => 'integer',
-            'power' => 'integer',
-            'life' => 'integer',
-            'level' => 'integer',
-            'speed' => 'integer',
+            'other_orientations' => 'array',
             'rarity' => 'integer',
+            'tcgplayer_product_id' => 'integer',
+            'market_price' => 'decimal:2',
+            'tcgplayer_low_price' => 'decimal:2',
+            'tcgplayer_high_price' => 'decimal:2',
+            'last_price_update' => 'datetime',
             'created_at' => 'datetime',
             'last_update' => 'datetime',
         ];
     }
 
     /**
-     * Get the editions for the card.
+     * Get the card that owns the edition.
      */
-    public function editions(): HasMany
+    public function card(): BelongsTo
     {
-        return $this->hasMany(Edition::class);
+        return $this->belongsTo(Card::class);
     }
 
     /**
-     * Get the card prices for the card.
+     * Get the set that owns the edition.
+     */
+    public function set(): BelongsTo
+    {
+        return $this->belongsTo(Set::class);
+    }
+
+    /**
+     * Get the card prices for the edition.
      */
     public function cardPrices(): HasMany
     {

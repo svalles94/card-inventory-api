@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Card extends Model
+class Set extends Model
 {
     use HasFactory;
 
@@ -46,30 +46,10 @@ class Card extends Model
     protected $fillable = [
         'id',
         'name',
-        'slug',
+        'prefix',
+        'language',
+        'release_date',
         'image',
-        'image_filename',
-        'cost_memory',
-        'cost_reserve',
-        'durability',
-        'power',
-        'life',
-        'level',
-        'speed',
-        'effect',
-        'effect_raw',
-        'effect_html',
-        'flavor',
-        'illustrator',
-        'types',
-        'subtypes',
-        'classes',
-        'elements',
-        'rule',
-        'referenced_by',
-        'references',
-        'rarity',
-        'legality',
         'created_at',
         'last_update',
     ];
@@ -82,40 +62,18 @@ class Card extends Model
     protected function casts(): array
     {
         return [
-            'types' => 'array',
-            'subtypes' => 'array',
-            'classes' => 'array',
-            'elements' => 'array',
-            'rule' => 'array',
-            'referenced_by' => 'array',
-            'references' => 'array',
-            'cost_memory' => 'integer',
-            'cost_reserve' => 'integer',
-            'durability' => 'integer',
-            'power' => 'integer',
-            'life' => 'integer',
-            'level' => 'integer',
-            'speed' => 'integer',
-            'rarity' => 'integer',
+            'release_date' => 'date',
             'created_at' => 'datetime',
             'last_update' => 'datetime',
         ];
     }
 
     /**
-     * Get the editions for the card.
+     * Get the editions for the set.
      */
     public function editions(): HasMany
     {
         return $this->hasMany(Edition::class);
-    }
-
-    /**
-     * Get the card prices for the card.
-     */
-    public function cardPrices(): HasMany
-    {
-        return $this->hasMany(CardPrice::class);
     }
 }
 

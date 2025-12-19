@@ -126,37 +126,61 @@ class CardResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('ID')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->limit(30),
+                    ->limit(25)
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::Small)
+                    ->weight('medium'),
                 Tables\Columns\TextColumn::make('elements')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', $state) : $state)
-                    ->color('info'),
+                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', array_slice($state, 0, 2)) . (count($state) > 2 ? '...' : '') : $state)
+                    ->color('info')
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
                 Tables\Columns\TextColumn::make('classes')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', $state) : $state)
-                    ->color('success'),
+                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', array_slice($state, 0, 2)) . (count($state) > 2 ? '...' : '') : $state)
+                    ->color('success')
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
                 Tables\Columns\TextColumn::make('cost_memory')
-                    ->label('Memory')
+                    ->label('M')
                     ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('cost_reserve')
-                    ->label('Reserve')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('power')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('rarity')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('last_update')
-                    ->dateTime()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
+                    ->alignCenter(),
+                Tables\Columns\TextColumn::make('cost_reserve')
+                    ->label('R')
+                    ->numeric()
+                    ->sortable()
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
+                    ->alignCenter(),
+                Tables\Columns\TextColumn::make('power')
+                    ->label('P')
+                    ->numeric()
+                    ->sortable()
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
+                    ->alignCenter(),
+                Tables\Columns\TextColumn::make('rarity')
+                    ->label('Rarity')
+                    ->numeric()
+                    ->sortable()
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
+                    ->alignCenter(),
+                Tables\Columns\TextColumn::make('editions_count')
+                    ->label('Ed.')
+                    ->counts('editions')
+                    ->badge()
+                    ->color('info')
+                    ->sortable()
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
+                    ->alignCenter(),
+                Tables\Columns\TextColumn::make('last_update')
+                    ->dateTime('M d, Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
             ])
             ->filters([
                 Tables\Filters\Filter::make('rarity')
@@ -181,21 +205,25 @@ class CardResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->iconButton(),
+                Tables\Actions\EditAction::make()
+                    ->iconButton(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('name');
+            ->defaultSort('name')
+            ->striped()
+            ->paginated([10, 25, 50, 100]);
     }
 
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\EditionsRelationManager::class,
         ];
     }
 
