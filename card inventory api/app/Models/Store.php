@@ -28,5 +28,10 @@ class Store extends Model
     {
         return $this->hasMany(Location::class);
     }
+    
+    public function marketplaceIntegrations(): HasMany
+    {
+        return $this->hasMany(MarketplaceIntegration::class);
+    }
 }
 

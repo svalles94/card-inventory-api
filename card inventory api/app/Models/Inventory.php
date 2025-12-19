@@ -16,6 +16,14 @@ class Inventory extends Model
         'location_id',
         'card_id',
         'quantity',
+        'buy_price',
+        'sell_price',
+        'market_price',
+        'shopify_location_id',
+        'shopify_inventory_level_id',
+        'last_synced_at',
+        'sync_status',
+        'sync_error',
     ];
 
     public function location(): BelongsTo
@@ -32,6 +40,10 @@ class Inventory extends Model
     {
         return [
             'card_id' => 'string',
+            'buy_price' => 'decimal:2',
+            'sell_price' => 'decimal:2',
+            'market_price' => 'decimal:2',
+            'last_synced_at' => 'datetime',
         ];
     }
 }

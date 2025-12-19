@@ -44,6 +44,10 @@ class Card extends Model
      */
     protected $fillable = [
         'id',
+        'game',
+        'set_code',
+        'set_name',
+        'card_number',
         'name',
         'slug',
         'image',
@@ -68,9 +72,15 @@ class Card extends Model
         'referenced_by',
         'references',
         'rarity',
+        'foil_type',
         'legality',
         'created_at',
         'last_update',
+        'shopify_product_id',
+        'shopify_variant_id',
+        'shopify_inventory_item_id',
+        'sku',
+        'sync_to_shopify',
     ];
 
     /**
@@ -98,7 +108,16 @@ class Card extends Model
             'rarity' => 'integer',
             'created_at' => 'datetime',
             'last_update' => 'datetime',
+            'sync_to_shopify' => 'boolean',
         ];
+    }
+    
+    /**
+     * Get the inventory records for this card.
+     */
+    public function inventory(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Inventory::class, 'card_id', 'id');
     }
 }
 
