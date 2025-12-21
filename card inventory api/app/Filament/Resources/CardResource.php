@@ -26,6 +26,7 @@ class CardResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Basic Information')
+                    ->collapsible()
                     ->schema([
                         Forms\Components\TextInput::make('id')
                             ->label('Card ID')
@@ -42,13 +43,15 @@ class CardResource extends Resource
                         Forms\Components\TextInput::make('image_filename')
                             ->maxLength(255),
                     ])
-                    ->columns(2),
+                    ->columns(3),
                 
                 Forms\Components\Section::make('Card Stats')
                     ->schema([
                         Forms\Components\TextInput::make('cost_memory')
+                            ->label('Memory')
                             ->numeric(),
                         Forms\Components\TextInput::make('cost_reserve')
+                            ->label('Reserve')
                             ->numeric(),
                         Forms\Components\TextInput::make('durability')
                             ->numeric(),
@@ -63,27 +66,30 @@ class CardResource extends Resource
                         Forms\Components\TextInput::make('rarity')
                             ->numeric(),
                     ])
-                    ->columns(4),
+                    ->columns(8),
                 
                 Forms\Components\Section::make('Card Text')
+                    ->collapsible()
                     ->schema([
                         Forms\Components\Textarea::make('effect')
-                            ->rows(3)
-                            ->columnSpanFull(),
-                        Forms\Components\Textarea::make('effect_raw')
-                            ->rows(3)
+                            ->rows(2)
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('effect_html')
-                            ->rows(3)
+                            ->rows(2)
+                            ->columnSpanFull(),
+                        Forms\Components\Textarea::make('effect_raw')
+                            ->rows(2)
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('flavor')
-                            ->rows(2)
+                            ->rows(1)
                             ->columnSpanFull(),
                         Forms\Components\TextInput::make('illustrator')
                             ->maxLength(255),
-                    ]),
+                    ])
+                    ->columns(1),
                 
                 Forms\Components\Section::make('Card Attributes')
+                    ->collapsible()
                     ->schema([
                         Forms\Components\TagsInput::make('types')
                             ->placeholder('Add type'),
@@ -94,9 +100,11 @@ class CardResource extends Resource
                         Forms\Components\TagsInput::make('elements')
                             ->placeholder('Add element'),
                     ])
-                    ->columns(2),
+                    ->columns(4),
                 
                 Forms\Components\Section::make('References')
+                    ->collapsible()
+                    ->collapsed()
                     ->schema([
                         Forms\Components\TagsInput::make('referenced_by')
                             ->placeholder('Add referenced by'),
@@ -109,6 +117,8 @@ class CardResource extends Resource
                     ->columns(1),
                 
                 Forms\Components\Section::make('Metadata')
+                    ->collapsible()
+                    ->collapsed()
                     ->schema([
                         Forms\Components\TextInput::make('legality')
                             ->maxLength(255),
