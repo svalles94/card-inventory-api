@@ -16,6 +16,7 @@ class Inventory extends Model
         'location_id',
         'card_id',
         'quantity',
+        'custom_price',
         'buy_price',
         'sell_price',
         'market_price',

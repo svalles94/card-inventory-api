@@ -120,5 +120,29 @@ class Card extends Model
     {
         return $this->hasMany(Inventory::class, 'card_id', 'id');
     }
+
+    /**
+     * Get the editions for this card.
+     */
+    public function editions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Edition::class, 'card_id', 'id');
+    }
+
+    /**
+     * Get the set this card belongs to.
+     */
+    public function set(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Set::class, 'set_code', 'code');
+    }
+
+    /**
+     * Get the prices for this card through its editions.
+     */
+    public function prices(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(CardPrice::class, Edition::class, 'card_id', 'edition_id', 'id', 'id');
+    }
 }
 
