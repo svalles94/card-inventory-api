@@ -12,7 +12,7 @@
             
             @if($hotCards->isEmpty())
                 <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <svg class="mx-auto h-12 w-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="mx-auto h-4 w-4 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
                     </svg>
                     No trending cards yet

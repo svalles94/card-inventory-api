@@ -92,6 +92,81 @@
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Hot Cards Widget - Reduce icon size */
+.fi-wi-stats-overview-stat svg,
+.fi-wi-stats-overview-stat .fi-icon,
+.fi-wi-stats-overview-stat [class*="icon"] {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    max-width: 1.5rem !important;
+    max-height: 1.5rem !important;
+}
+
+/* Hot Cards Widget - Reduce chart/graph size */
+.fi-wi-stats-overview-stat canvas,
+.fi-wi-stats-overview-stat svg[class*="chart"],
+.fi-wi-stats-overview-stat [class*="chart"] {
+    max-width: 2rem !important;
+    max-height: 2rem !important;
+    width: 2rem !important;
+    height: 2rem !important;
+}
+
+/* Hot Cards Widget - Target the widget section specifically */
+.fi-section:has(h3:contains("Hot Cards")) svg,
+.fi-section:has(h3:contains("Hot Cards")) [class*="icon"],
+.fi-section:has(h3:contains("Hot Cards")) canvas {
+    width: 1rem !important;
+    height: 1rem !important;
+    max-width: 1rem !important;
+    max-height: 1rem !important;
+}
+
+/* Hot Cards Widget - Override Tailwind classes for SVG icons */
+.fi-section svg.h-12,
+.fi-section svg.w-12,
+.fi-section svg.h-12.w-12 {
+    width: 1rem !important;
+    height: 1rem !important;
+    max-width: 1rem !important;
+    max-height: 1rem !important;
+}
+
+/* Alternative selector for Hot Cards widget icon */
+[class*="hot-cards"] svg,
+[class*="hot-cards"] [class*="icon"],
+[class*="hot-cards"] canvas,
+.fi-wi-stats-overview-stat:has([class*="hot"]) svg,
+.fi-wi-stats-overview-stat:has([class*="hot"]) [class*="icon"],
+.fi-wi-stats-overview-stat:has([class*="hot"]) canvas {
+    width: 1rem !important;
+    height: 1rem !important;
+    max-width: 1rem !important;
+    max-height: 1rem !important;
+}
+
+/* General widget icon size reduction - target large icons/charts in widgets */
+.fi-widget svg[width][height],
+.fi-widget canvas[width][height],
+.fi-widget [class*="chart"] svg,
+.fi-widget [class*="chart"] canvas {
+    max-width: 1.5rem !important;
+    max-height: 1.5rem !important;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+}
+
+/* Target any large graphics in widget sections */
+.fi-section svg[width="100%"],
+.fi-section svg[height="100%"],
+.fi-section canvas[width="100%"],
+.fi-section canvas[height="100%"] {
+    max-width: 2rem !important;
+    max-height: 2rem !important;
+    width: 2rem !important;
+    height: 2rem !important;
+}
+
 /* Dark Mode Enhancements */
 .dark .fi-login-option {
     background: rgba(30, 41, 59, 0.95);

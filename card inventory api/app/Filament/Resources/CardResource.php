@@ -118,6 +118,32 @@ class CardResource extends Resource
                     ])
                     ->columns(1),
                 
+                Forms\Components\Section::make('Pricing')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\TextInput::make('latest_market_price')
+                            ->label('Latest Market Price')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(function ($record) {
+                                if (!$record) return 'N/A';
+                                $latestPrice = $record->cardPrices()
+                                    ->whereNotNull('market_price')
+                                    ->orderBy('last_updated', 'desc')
+                                    ->first();
+                                return $latestPrice ? '$' . number_format($latestPrice->market_price, 2) : 'No price data';
+                            }),
+                        Forms\Components\TextInput::make('price_count')
+                            ->label('Price Records')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(function ($record) {
+                                if (!$record) return '0';
+                                return $record->cardPrices()->count();
+                            }),
+                    ])
+                    ->columns(2),
+                
                 Forms\Components\Section::make('Metadata')
                     ->collapsible()
                     ->collapsed()
@@ -143,56 +169,40 @@ class CardResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->limit(25)
+                    ->limit(30)
                     ->size(Tables\Columns\TextColumn\TextColumnSize::Small)
                     ->weight('medium'),
                 Tables\Columns\TextColumn::make('elements')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', array_slice($state, 0, 2)) . (count($state) > 2 ? '...' : '') : $state)
+                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', array_slice($state, 0, 3)) . (count($state) > 3 ? '...' : '') : $state)
                     ->color('info')
                     ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
                 Tables\Columns\TextColumn::make('classes')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', array_slice($state, 0, 2)) . (count($state) > 2 ? '...' : '') : $state)
+                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', array_slice($state, 0, 3)) . (count($state) > 3 ? '...' : '') : $state)
                     ->color('success')
                     ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
-                Tables\Columns\TextColumn::make('cost_memory')
-                    ->label('M')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('market_price')
+                    ->label('Market Price')
+                    ->money('USD')
                     ->sortable()
                     ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
-                    ->alignCenter(),
-                Tables\Columns\TextColumn::make('cost_reserve')
-                    ->label('R')
-                    ->numeric()
-                    ->sortable()
-                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
-                    ->alignCenter(),
-                Tables\Columns\TextColumn::make('power')
-                    ->label('P')
-                    ->numeric()
-                    ->sortable()
-                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
-                    ->alignCenter(),
-                Tables\Columns\TextColumn::make('rarity')
-                    ->label('Rarity')
-                    ->numeric()
-                    ->sortable()
-                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
-                    ->alignCenter(),
+                    ->alignEnd()
+                    ->state(function ($record) {
+                        $latestPrice = $record->cardPrices()
+                            ->whereNotNull('market_price')
+                            ->orderBy('last_updated', 'desc')
+                            ->first();
+                        return $latestPrice?->market_price;
+                    }),
                 Tables\Columns\TextColumn::make('editions_count')
-                    ->label('Ed.')
+                    ->label('Editions')
                     ->counts('editions')
                     ->badge()
                     ->color('info')
                     ->sortable()
                     ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
                     ->alignCenter(),
-                Tables\Columns\TextColumn::make('last_update')
-                    ->dateTime('M d, Y')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall),
             ])
             ->filters([
                 Tables\Filters\Filter::make('rarity')
@@ -236,6 +246,7 @@ class CardResource extends Resource
     {
         return [
             RelationManagers\EditionsRelationManager::class,
+            RelationManagers\PricesRelationManager::class,
         ];
     }
 
