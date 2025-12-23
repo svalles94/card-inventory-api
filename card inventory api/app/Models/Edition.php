@@ -113,5 +113,13 @@ class Edition extends Model
     {
         return $this->hasMany(CardPrice::class);
     }
+
+    /**
+     * Alias for cardPrices relationship.
+     */
+    public function prices(): HasMany
+    {
+        return $this->cardPrices();
+    }
 }
 
