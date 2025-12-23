@@ -15,6 +15,7 @@ class Inventory extends Model
     protected $fillable = [
         'location_id',
         'card_id',
+        'is_foil',
         'quantity',
         'custom_price',
         'buy_price',
@@ -41,6 +42,7 @@ class Inventory extends Model
     {
         return [
             'card_id' => 'string',
+            'is_foil' => 'boolean',
             'buy_price' => 'decimal:2',
             'sell_price' => 'decimal:2',
             'market_price' => 'decimal:2',
