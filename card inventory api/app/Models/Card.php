@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Card extends Model
 {
@@ -118,6 +119,22 @@ class Card extends Model
     public function inventory(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Inventory::class, 'card_id', 'id');
+    }
+
+    /**
+     * Get the editions for the card.
+     */
+    public function editions(): HasMany
+    {
+        return $this->hasMany(Edition::class);
+    }
+
+    /**
+     * Get the card prices for the card.
+     */
+    public function cardPrices(): HasMany
+    {
+        return $this->hasMany(CardPrice::class);
     }
 }
 
