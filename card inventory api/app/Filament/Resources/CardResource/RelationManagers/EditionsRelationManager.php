@@ -124,11 +124,19 @@ class EditionsRelationManager extends RelationManager
                     ->size(40)
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('market_price')
+                    ->label('Market Price')
                     ->money('USD')
                     ->sortable()
-                    ->toggleable()
                     ->size(Tables\Columns\TextColumn\TextColumnSize::ExtraSmall)
-                    ->alignEnd(),
+                    ->alignEnd()
+                    ->state(function ($record) {
+                        // Get the latest market price from card_prices table
+                        $latestPrice = $record->cardPrices()
+                            ->whereNotNull('market_price')
+                            ->orderBy('last_updated', 'desc')
+                            ->first();
+                        return $latestPrice?->market_price ?? $record->market_price;
+                    }),
                 Tables\Columns\TextColumn::make('tcgplayer_low_price')
                     ->money('USD')
                     ->label('Low')

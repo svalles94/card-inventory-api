@@ -35,4 +35,6 @@ return [
         ],
     ],
 
+    'price_sync_api_base_url' => env('PRICE_SYNC_API_URL', 'https://api.tcgarchitect.com'),
+
 ];
