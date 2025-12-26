@@ -144,5 +144,35 @@ class Card extends Model
     {
         return $this->hasManyThrough(CardPrice::class, Edition::class, 'card_id', 'edition_id', 'id', 'id');
     }
+
+    /**
+     * Get the card prices directly (card-level pricing, not edition-specific).
+     */
+    public function cardPrices(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CardPrice::class, 'card_id', 'id');
+    }
+
+    /**
+     * Get the full image URL for this card.
+     * If image is already a full URL, return it. Otherwise, prepend the Grand Archive API base URL.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image) {
+            return null;
+        }
+
+        // If it's already a full URL, return it as-is
+        if (filter_var($this->image, FILTER_VALIDATE_URL)) {
+            return $this->image;
+        }
+
+        // Otherwise, construct the full URL using the Grand Archive API base
+        $baseUrl = rtrim('https://api.gatcg.com', '/');
+        $imagePath = ltrim($this->image, '/');
+        
+        return $baseUrl . '/' . $imagePath;
+    }
 }
 

@@ -236,13 +236,27 @@
 
                                 {{-- Stock Badge --}}
                                 @php
-                                    $qty = $card->inventory->first()?->quantity ?? 0;
-                                    $badgeColor = $qty === 0 ? 'bg-gray-500' : ($qty < 4 ? 'bg-red-500' : ($qty < 10 ? 'bg-yellow-500' : 'bg-green-500'));
+                                    $normalQty = $card->inventory->where('is_foil', false)->sum('quantity');
+                                    $foilQty = $card->inventory->where('is_foil', true)->sum('quantity');
+                                    $totalQty = $normalQty + $foilQty;
+                                    $badgeColor = $totalQty === 0 ? 'bg-gray-500' : ($totalQty < 4 ? 'bg-red-500' : ($totalQty < 10 ? 'bg-yellow-500' : 'bg-green-500'));
                                 @endphp
-                                <div class="absolute top-2 right-2">
-                                    <span class="px-2 py-1 text-xs font-bold text-white rounded {{ $badgeColor }} shadow">
-                                        {{ $qty }}
-                                    </span>
+                                <div class="absolute top-2 right-2 flex flex-col gap-1">
+                                    @if($normalQty > 0)
+                                        <span class="px-2 py-1 text-xs font-bold text-white rounded {{ $badgeColor }} shadow">
+                                            {{ $normalQty }}
+                                        </span>
+                                    @endif
+                                    @if($foilQty > 0)
+                                        <span class="px-2 py-1 text-xs font-bold text-white rounded bg-yellow-500 shadow">
+                                            ✨{{ $foilQty }}
+                                        </span>
+                                    @endif
+                                    @if($totalQty === 0)
+                                        <span class="px-2 py-1 text-xs font-bold text-white rounded bg-gray-500 shadow">
+                                            0
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
 
@@ -289,7 +303,9 @@
                 <div class="divide-y divide-gray-200 dark:divide-gray-700">
                     @forelse($this->cards as $card)
                         @php
-                            $qty = $card->inventory->first()?->quantity ?? 0;
+                            $normalQty = $card->inventory->where('is_foil', false)->sum('quantity');
+                            $foilQty = $card->inventory->where('is_foil', true)->sum('quantity');
+                            $totalQty = $normalQty + $foilQty;
                         @endphp
                         <div class="p-4 hover:bg-gray-700/50 transition flex items-center gap-4">
                             {{-- Card Name --}}
@@ -310,10 +326,22 @@
                             </div>
 
                             {{-- Quantity Display --}}
-                            <div class="text-center min-w-[60px]">
-                                <div class="text-2xl font-bold {{ $qty > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400' }}">
-                                    {{ $qty }}
-                                </div>
+                            <div class="text-center min-w-[100px]">
+                                @if($normalQty > 0)
+                                    <div class="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                        {{ $normalQty }} Normal
+                                    </div>
+                                @endif
+                                @if($foilQty > 0)
+                                    <div class="text-lg font-bold text-yellow-500">
+                                        ✨{{ $foilQty }} Foil
+                                    </div>
+                                @endif
+                                @if($totalQty === 0)
+                                    <div class="text-lg font-bold text-gray-400">
+                                        0
+                                    </div>
+                                @endif
                                 <div class="text-xs text-gray-500 dark:text-gray-400">in stock</div>
                             </div>
 
@@ -389,7 +417,9 @@
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @forelse($this->cards as $card)
                                 @php
-                                    $qty = $card->inventory->first()?->quantity ?? 0;
+                                    $normalQty = $card->inventory->where('is_foil', false)->sum('quantity');
+                                    $foilQty = $card->inventory->where('is_foil', true)->sum('quantity');
+                                    $totalQty = $normalQty + $foilQty;
                                 @endphp
                                 <tr class="hover:bg-gray-700/50 transition">
                                     <td class="px-4 py-3">
@@ -429,42 +459,88 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">
-                                        <div class="flex items-center justify-center gap-2">
-                                            <button
-                                                wire:click="quickUpdateInventory('{{ $card->id }}', 'remove5')"
-                                                class="p-1 rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition text-xs"
-                                                title="Remove 5"
-                                            >
-                                                -5
-                                            </button>
-                                            <button
-                                                wire:click="quickUpdateInventory('{{ $card->id }}', 'remove')"
-                                                class="p-1 rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition"
-                                                title="Remove 1"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-                                                </svg>
-                                            </button>
-                                            <span class="text-xl font-bold {{ $qty > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400' }} min-w-[3rem] text-center">
-                                                {{ $qty }}
-                                            </span>
-                                            <button
-                                                wire:click="quickUpdateInventory('{{ $card->id }}', 'add')"
-                                                class="p-1 rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition"
-                                                title="Add 1"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                wire:click="quickUpdateInventory('{{ $card->id }}', 'add5')"
-                                                class="p-1 rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition text-xs"
-                                                title="Add 5"
-                                            >
-                                                +5
-                                            </button>
+                                        <div class="flex flex-col items-center gap-1">
+                                            @if($normalQty > 0)
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'remove5', false)"
+                                                        class="p-1 rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition text-xs"
+                                                        title="Remove 5 Normal"
+                                                    >
+                                                        -5
+                                                    </button>
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'remove', false)"
+                                                        class="p-1 rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition"
+                                                        title="Remove 1 Normal"
+                                                    >
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                                                        </svg>
+                                                    </button>
+                                                    <span class="text-lg font-bold text-blue-600 dark:text-blue-400 min-w-[3rem] text-center">
+                                                        {{ $normalQty }}
+                                                    </span>
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'add', false)"
+                                                        class="p-1 rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition"
+                                                        title="Add 1 Normal"
+                                                    >
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'add5', false)"
+                                                        class="p-1 rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition text-xs"
+                                                        title="Add 5 Normal"
+                                                    >
+                                                        +5
+                                                    </button>
+                                                </div>
+                                            @endif
+                                            @if($foilQty > 0)
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'remove5', true)"
+                                                        class="p-1 rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition text-xs"
+                                                        title="Remove 5 Foil"
+                                                    >
+                                                        -5
+                                                    </button>
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'remove', true)"
+                                                        class="p-1 rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition"
+                                                        title="Remove 1 Foil"
+                                                    >
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                                                        </svg>
+                                                    </button>
+                                                    <span class="text-lg font-bold text-yellow-500 min-w-[3rem] text-center">
+                                                        ✨{{ $foilQty }}
+                                                    </span>
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'add', true)"
+                                                        class="p-1 rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition"
+                                                        title="Add 1 Foil"
+                                                    >
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        wire:click="quickUpdateInventory('{{ $card->id }}', 'add5', true)"
+                                                        class="p-1 rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition text-xs"
+                                                        title="Add 5 Foil"
+                                                    >
+                                                        +5
+                                                    </button>
+                                                </div>
+                                            @endif
+                                            @if($totalQty === 0)
+                                                <span class="text-lg font-bold text-gray-400">0</span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-center">
@@ -709,36 +785,83 @@
                                     </div>
                                 @endif
 
-                                {{-- Pricing Section --}}
+                                {{-- Pricing Section - Horizontal Layout --}}
                                 <div class="bg-gray-900 rounded-lg p-4">
-                                    <h3 class="text-lg font-semibold text-white mb-3">Pricing</h3>
+                                    <h3 class="text-lg font-semibold text-white mb-3">Pricing Guide</h3>
                                     
                                     @if($modalEditions && count($modalEditions) > 0)
                                         @foreach($modalEditions as $index => $edition)
                                             <div x-show="selectedEdition == {{ $index }}">
                                                 @if(!empty($edition['prices']) && count($edition['prices']) > 0)
-                                                    @foreach($edition['prices'] as $price)
-                                                        <div class="grid grid-cols-3 gap-4 text-center">
-                                                            <div>
-                                                                <div class="text-xs text-gray-400 mb-1">Market</div>
-                                                                <div class="text-2xl font-bold text-green-400">
-                                                                    ${{ number_format($price['market_price'] ?? 0, 2) }}
-                                                                </div>
+                                                    {{-- Find normal and foil prices --}}
+                                                    @php
+                                                        $normalPrice = collect($edition['prices'])->firstWhere('sub_type_name', 'Normal');
+                                                        $foilPrice = collect($edition['prices'])->firstWhere('sub_type_name', 'Foil');
+                                                    @endphp
+                                                    
+                                                    <div class="grid grid-cols-2 gap-4">
+                                                        {{-- Normal Pricing --}}
+                                                        <div class="bg-gray-800 rounded-lg p-4 border-2 border-gray-700">
+                                                            <div class="text-center mb-3">
+                                                                <h4 class="text-sm font-bold text-gray-300 uppercase tracking-wide">Normal</h4>
                                                             </div>
-                                                            <div>
-                                                                <div class="text-xs text-gray-400 mb-1">Low</div>
-                                                                <div class="text-2xl font-bold text-blue-400">
-                                                                    ${{ number_format($price['low_price'] ?? 0, 2) }}
+                                                            @if($normalPrice)
+                                                                <div class="grid grid-cols-3 gap-2 text-center">
+                                                                    <div>
+                                                                        <div class="text-xs text-gray-400 mb-1">Market</div>
+                                                                        <div class="text-lg font-bold text-green-400">
+                                                                            ${{ number_format($normalPrice['market_price'] ?? 0, 2) }}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div class="text-xs text-gray-400 mb-1">Low</div>
+                                                                        <div class="text-lg font-bold text-blue-400">
+                                                                            ${{ number_format($normalPrice['low_price'] ?? 0, 2) }}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div class="text-xs text-gray-400 mb-1">High</div>
+                                                                        <div class="text-lg font-bold text-red-400">
+                                                                            ${{ number_format($normalPrice['high_price'] ?? 0, 2) }}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                            <div>
-                                                                <div class="text-xs text-gray-400 mb-1">High</div>
-                                                                <div class="text-2xl font-bold text-red-400">
-                                                                    ${{ number_format($price['high_price'] ?? 0, 2) }}
-                                                                </div>
-                                                            </div>
+                                                            @else
+                                                                <p class="text-gray-500 text-center text-sm py-2">No pricing data</p>
+                                                            @endif
                                                         </div>
-                                                    @endforeach
+
+                                                        {{-- Foil Pricing --}}
+                                                        <div class="bg-gray-800 rounded-lg p-4 border-2 border-yellow-600/50">
+                                                            <div class="text-center mb-3">
+                                                                <h4 class="text-sm font-bold text-yellow-400 uppercase tracking-wide">✨ Foil</h4>
+                                                            </div>
+                                                            @if($foilPrice)
+                                                                <div class="grid grid-cols-3 gap-2 text-center">
+                                                                    <div>
+                                                                        <div class="text-xs text-gray-400 mb-1">Market</div>
+                                                                        <div class="text-lg font-bold text-green-400">
+                                                                            ${{ number_format($foilPrice['market_price'] ?? 0, 2) }}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div class="text-xs text-gray-400 mb-1">Low</div>
+                                                                        <div class="text-lg font-bold text-blue-400">
+                                                                            ${{ number_format($foilPrice['low_price'] ?? 0, 2) }}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div class="text-xs text-gray-400 mb-1">High</div>
+                                                                        <div class="text-lg font-bold text-red-400">
+                                                                            ${{ number_format($foilPrice['high_price'] ?? 0, 2) }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            @else
+                                                                <p class="text-gray-500 text-center text-sm py-2">No pricing data</p>
+                                                            @endif
+                                                        </div>
+                                                    </div>
                                                 @else
                                                     <p class="text-gray-400 text-center py-4">No pricing data available for this edition</p>
                                                 @endif
@@ -753,88 +876,200 @@
                                 <div class="space-y-4">
                                     {{-- Current Inventory Display --}}
                                     @if($modalInventory && count($modalInventory) > 0)
-                                        <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-                                            <div class="text-sm text-blue-300 mb-1">Current Inventory</div>
-                                            <div class="text-3xl font-bold text-blue-400">
-                                                {{ $modalInventory[0]['quantity'] ?? 0 }} in stock
-                                            </div>
-                                            @if($modalInventory[0]['custom_price'])
-                                                <div class="text-sm text-green-300 mt-2">
-                                                    Your Price: ${{ number_format($modalInventory[0]['custom_price'], 2) }}
+                                        @php
+                                            $normalInv = collect($modalInventory)->where('is_foil', false)->first();
+                                            $foilInv = collect($modalInventory)->where('is_foil', true)->first();
+                                        @endphp
+                                        <div class="grid grid-cols-2 gap-4">
+                                            {{-- Normal Inventory --}}
+                                            <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                                                <div class="text-sm text-blue-300 mb-1">Normal In Stock</div>
+                                                <div class="text-3xl font-bold text-blue-400">
+                                                    {{ $normalInv['quantity'] ?? 0 }}
                                                 </div>
-                                            @endif
+                                                @if($normalInv && $normalInv['custom_price'])
+                                                    <div class="text-sm text-green-300 mt-2">
+                                                        Your Price: ${{ number_format($normalInv['custom_price'], 2) }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            
+                                            {{-- Foil Inventory --}}
+                                            <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
+                                                <div class="text-sm text-yellow-300 mb-1">✨ Foil In Stock</div>
+                                                <div class="text-3xl font-bold text-yellow-400">
+                                                    {{ $foilInv['quantity'] ?? 0 }}
+                                                </div>
+                                                @if($foilInv && $foilInv['custom_price'])
+                                                    <div class="text-sm text-green-300 mt-2">
+                                                        Your Price: ${{ number_format($foilInv['custom_price'], 2) }}
+                                                    </div>
+                                                @endif
+                                            </div>
                                         </div>
                                     @endif
 
-                                    {{-- Custom Pricing Section --}}
+                                    {{-- Custom Pricing Section - Horizontal Layout --}}
                                     <div class="bg-gray-900 border border-gray-700 rounded-lg p-4">
                                         <h4 class="text-lg font-semibold text-white mb-3">Set Your Price</h4>
                                         
-                                        @if($marketPrice)
-                                            <div class="mb-3 text-sm text-gray-400">
-                                                Market Price: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
-                                            </div>
-                                        @endif
-
-                                        {{-- Custom Price Input --}}
-                                        <div class="mb-3">
-                                            <label class="block text-sm font-medium text-gray-300 mb-2">Custom Price</label>
-                                            <div class="flex">
-                                                <span class="flex items-center px-3 bg-gray-200 text-black font-semibold rounded-l-lg border border-r-0 border-gray-400">$</span>
+                                        {{-- Foil Checkbox --}}
+                                        <div class="mb-4 flex items-center justify-center p-3 bg-gray-800 rounded-lg">
+                                            <label class="flex items-center cursor-pointer">
                                                 <input 
-                                                    type="number" 
-                                                    wire:model.live="customPrice"
-                                                    step="0.01"
-                                                    min="0"
-                                                    placeholder="{{ $marketPrice ? number_format($marketPrice, 2) : '0.00' }}"
-                                                    class="flex-1 rounded-r-lg border-gray-400 bg-gray-200 text-black placeholder-gray-600 focus:border-blue-500 focus:ring-blue-500 font-semibold"
+                                                    type="checkbox" 
+                                                    wire:model.live="isFoil"
+                                                    class="w-5 h-5 text-yellow-500 bg-gray-700 border-gray-600 rounded focus:ring-yellow-500 focus:ring-2"
                                                 />
-                                            </div>
+                                                <span class="ml-3 text-lg font-semibold" :class="$wire.isFoil ? 'text-yellow-400' : 'text-gray-300'">
+                                                    ✨ This is a Foil Card
+                                                </span>
+                                            </label>
                                         </div>
 
-                                        {{-- Quick Price Buttons --}}
-                                        @if($marketPrice)
-                                            <div class="space-y-2">
-                                                <label class="block text-sm font-medium text-gray-300">Quick Adjust</label>
-                                                <div class="grid grid-cols-2 gap-2">
-                                                    <button
-                                                        wire:click="applyPricePercentage(-10)"
-                                                        class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition"
-                                                    >
-                                                        -10% (${{ number_format($marketPrice * 0.9, 2) }})
-                                                    </button>
-                                                    <button
-                                                        wire:click="applyPricePercentage(-5)"
-                                                        class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition"
-                                                    >
-                                                        -5% (${{ number_format($marketPrice * 0.95, 2) }})
-                                                    </button>
-                                                    <button
-                                                        wire:click="applyPricePercentage(5)"
-                                                        class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition"
-                                                    >
-                                                        +5% (${{ number_format($marketPrice * 1.05, 2) }})
-                                                    </button>
-                                                    <button
-                                                        wire:click="applyPricePercentage(10)"
-                                                        class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition"
-                                                    >
-                                                        +10% (${{ number_format($marketPrice * 1.10, 2) }})
-                                                    </button>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            {{-- Normal Pricing Column --}}
+                                            <div class="bg-gray-800 rounded-lg p-4 border-2" :class="$wire.isFoil ? 'border-gray-700 opacity-50' : 'border-blue-600'">
+                                                <div class="text-center mb-3">
+                                                    <h5 class="text-sm font-bold text-gray-300 uppercase tracking-wide">Normal Price</h5>
                                                 </div>
-                                                <button
-                                                    wire:click="setCustomPrice({{ $marketPrice }})"
-                                                    class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition"
-                                                >
-                                                    Use Market Price (${{ number_format($marketPrice, 2) }})
-                                                </button>
+                                                
+                                                @if($marketPrice && !$isFoil)
+                                                    <div class="mb-3 text-sm text-center text-gray-400">
+                                                        Market: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
+                                                    </div>
+                                                @endif
+
+                                                <div class="mb-3" x-show="!$wire.isFoil">
+                                                    <label class="block text-xs font-medium text-gray-300 mb-2 text-center">Your Price</label>
+                                                    <div class="flex">
+                                                        <span class="flex items-center px-3 bg-gray-200 text-black font-semibold rounded-l-lg border border-r-0 border-gray-400">$</span>
+                                                        <input 
+                                                            type="number" 
+                                                            wire:model.live="customPrice"
+                                                            step="0.01"
+                                                            min="0"
+                                                            placeholder="{{ $marketPrice ? number_format($marketPrice, 2) : '0.00' }}"
+                                                            class="flex-1 rounded-r-lg border-gray-400 bg-gray-200 text-black placeholder-gray-600 focus:border-blue-500 focus:ring-blue-500 font-semibold"
+                                                            :disabled="$wire.isFoil"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                @if($marketPrice && !$isFoil)
+                                                    <div class="space-y-2" x-show="!$wire.isFoil">
+                                                        <label class="block text-xs font-medium text-gray-300 text-center">Quick Adjust</label>
+                                                        <div class="grid grid-cols-2 gap-2">
+                                                            <button
+                                                                wire:click="applyPricePercentage(-10)"
+                                                                class="px-2 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                -10%
+                                                            </button>
+                                                            <button
+                                                                wire:click="applyPricePercentage(-5)"
+                                                                class="px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                -5%
+                                                            </button>
+                                                            <button
+                                                                wire:click="applyPricePercentage(5)"
+                                                                class="px-2 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                +5%
+                                                            </button>
+                                                            <button
+                                                                wire:click="applyPricePercentage(10)"
+                                                                class="px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                +10%
+                                                            </button>
+                                                        </div>
+                                                        <button
+                                                            wire:click="setCustomPrice({{ $marketPrice }})"
+                                                            class="w-full px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition"
+                                                        >
+                                                            Use Market
+                                                        </button>
+                                                    </div>
+                                                @endif
                                             </div>
-                                        @endif
+
+                                            {{-- Foil Pricing Column --}}
+                                            <div class="bg-gray-800 rounded-lg p-4 border-2" :class="$wire.isFoil ? 'border-yellow-600' : 'border-gray-700 opacity-50'">
+                                                <div class="text-center mb-3">
+                                                    <h5 class="text-sm font-bold text-yellow-400 uppercase tracking-wide">✨ Foil Price</h5>
+                                                </div>
+                                                
+                                                @if($marketPrice && $isFoil)
+                                                    <div class="mb-3 text-sm text-center text-gray-400">
+                                                        Market: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
+                                                    </div>
+                                                @endif
+
+                                                <div class="mb-3" x-show="$wire.isFoil">
+                                                    <label class="block text-xs font-medium text-gray-300 mb-2 text-center">Your Price</label>
+                                                    <div class="flex">
+                                                        <span class="flex items-center px-3 bg-gray-200 text-black font-semibold rounded-l-lg border border-r-0 border-gray-400">$</span>
+                                                        <input 
+                                                            type="number" 
+                                                            wire:model.live="customPrice"
+                                                            step="0.01"
+                                                            min="0"
+                                                            placeholder="{{ $marketPrice ? number_format($marketPrice, 2) : '0.00' }}"
+                                                            class="flex-1 rounded-r-lg border-gray-400 bg-gray-200 text-black placeholder-gray-600 focus:border-blue-500 focus:ring-blue-500 font-semibold"
+                                                            :disabled="!$wire.isFoil"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                @if($marketPrice && $isFoil)
+                                                    <div class="space-y-2" x-show="$wire.isFoil">
+                                                        <label class="block text-xs font-medium text-gray-300 text-center">Quick Adjust</label>
+                                                        <div class="grid grid-cols-2 gap-2">
+                                                            <button
+                                                                wire:click="applyPricePercentage(-10)"
+                                                                class="px-2 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                -10%
+                                                            </button>
+                                                            <button
+                                                                wire:click="applyPricePercentage(-5)"
+                                                                class="px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                -5%
+                                                            </button>
+                                                            <button
+                                                                wire:click="applyPricePercentage(5)"
+                                                                class="px-2 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                +5%
+                                                            </button>
+                                                            <button
+                                                                wire:click="applyPricePercentage(10)"
+                                                                class="px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
+                                                            >
+                                                                +10%
+                                                            </button>
+                                                        </div>
+                                                        <button
+                                                            wire:click="setCustomPrice({{ $marketPrice }})"
+                                                            class="w-full px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition"
+                                                        >
+                                                            Use Market
+                                                        </button>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {{-- Add to Inventory --}}
                                     <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-                                        <label class="block text-sm font-medium text-blue-300 mb-2">Add to Inventory</label>
+                                        <label class="block text-sm font-medium text-blue-300 mb-2">
+                                            Add to Inventory
+                                            <span x-show="$wire.isFoil" class="text-yellow-400 ml-2">✨ (Foil)</span>
+                                        </label>
                                         <div class="flex gap-3">
                                             <input 
                                                 type="number" 
@@ -859,7 +1094,10 @@
 
                                     {{-- Remove from Inventory --}}
                                     <div class="bg-red-900/30 border border-red-700 rounded-lg p-4">
-                                        <label class="block text-sm font-medium text-red-300 mb-2">Remove from Inventory</label>
+                                        <label class="block text-sm font-medium text-red-300 mb-2">
+                                            Remove from Inventory
+                                            <span x-show="$wire.isFoil" class="text-yellow-400 ml-2">✨ (Foil)</span>
+                                        </label>
                                         <div class="flex gap-3">
                                             <input 
                                                 type="number" 
@@ -936,12 +1174,17 @@
                             {{-- Changes List --}}
                             <div class="bg-gray-900 rounded-lg p-4 mb-6 max-h-96 overflow-y-auto">
                                 <div class="space-y-3">
-                                    @foreach($pendingChanges as $cardId => $change)
+                                    @foreach($pendingChanges as $changeKey => $change)
                                         <div class="p-3 bg-gray-800 rounded-lg">
                                             <div class="flex items-center justify-between">
                                                 <div class="flex-1">
-                                                    <div class="font-semibold text-white">{{ $change['name'] }}</div>
-                                                    <div class="text-xs text-gray-400">Card ID: {{ $cardId }}</div>
+                                                    <div class="font-semibold text-white">
+                                                        {{ $change['name'] }}
+                                                        @if($change['is_foil'] ?? false)
+                                                            <span class="text-yellow-400 ml-2">✨ Foil</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="text-xs text-gray-400">Card ID: {{ $change['card_id'] ?? $changeKey }}</div>
                                                     @if(isset($change['custom_price']))
                                                         <div class="text-sm text-green-400 mt-1">
                                                             Price: ${{ number_format($change['custom_price'], 2) }}

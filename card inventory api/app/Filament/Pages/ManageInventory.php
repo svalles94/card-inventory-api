@@ -45,6 +45,7 @@ class ManageInventory extends Page
     public ?array $modalInventory = null;
     public int $quantityToAdd = 1;
     public int $quantityToRemove = 1;
+    public bool $isFoil = false;
     public ?float $customPrice = null;
     public ?float $marketPrice = null;
     
@@ -172,7 +173,7 @@ class ManageInventory extends Page
         $this->resetPage();
     }
     
-    public function quickUpdateInventory(string $cardId, string $action): void
+    public function quickUpdateInventory(string $cardId, string $action, bool $isFoil = false): void
     {
         if (!$this->selectedLocationId) {
             Notification::make()
@@ -184,6 +185,7 @@ class ManageInventory extends Page
         
         $inventory = Inventory::where('location_id', $this->selectedLocationId)
             ->where('card_id', $cardId)
+            ->where('is_foil', $isFoil)
             ->first();
         
         $currentQty = $inventory?->quantity ?? 0;
@@ -200,6 +202,7 @@ class ManageInventory extends Page
             [
                 'location_id' => $this->selectedLocationId,
                 'card_id' => $cardId,
+                'is_foil' => $isFoil,
             ],
             [
                 'quantity' => $newQty,
@@ -261,6 +264,8 @@ class ManageInventory extends Page
         }
         
         $this->quantityToAdd = 1;
+        $this->quantityToRemove = 1;
+        $this->isFoil = false;
         $this->showCardModal = true;
     }
     
@@ -271,6 +276,7 @@ class ManageInventory extends Page
         $this->modalCardData = null;
         $this->modalEditions = null;
         $this->modalInventory = null;
+        $this->isFoil = false;
         $this->customPrice = null;
         $this->marketPrice = null;
     }
@@ -331,34 +337,38 @@ class ManageInventory extends Page
             return;
         }
         
-        // Track pending change
+        // Track pending change with foil status as part of the key
         $cardId = $this->modalCardId;
         $cardName = $this->modalCardData['name'] ?? 'Unknown Card';
+        $changeKey = $cardId . ($this->isFoil ? '_foil' : '_normal');
         
-        if (!isset($this->pendingChanges[$cardId])) {
-            $this->pendingChanges[$cardId] = [
+        if (!isset($this->pendingChanges[$changeKey])) {
+            $this->pendingChanges[$changeKey] = [
+                'card_id' => $cardId,
                 'name' => $cardName,
+                'is_foil' => $this->isFoil,
                 'change' => 0,
             ];
         }
         
-        $this->pendingChanges[$cardId]['change'] += $this->quantityToAdd;
+        $this->pendingChanges[$changeKey]['change'] += $this->quantityToAdd;
         
         // Include custom price if set
         if ($this->customPrice !== null) {
-            $this->pendingChanges[$cardId]['custom_price'] = $this->customPrice;
+            $this->pendingChanges[$changeKey]['custom_price'] = $this->customPrice;
         }
         
         // Force Livewire to detect the change
         $this->pendingChanges = $this->pendingChanges;
         
+        $foilText = $this->isFoil ? ' (Foil)' : '';
         $notification = Notification::make()
-            ->title("Queued +{$this->quantityToAdd} to {$cardName}")
-            ->body("Total pending: " . count($this->pendingChanges) . " cards")
+            ->title("Queued +{$this->quantityToAdd} to {$cardName}{$foilText}")
+            ->body("Total pending: " . count($this->pendingChanges) . " changes")
             ->success();
             
         if ($this->customPrice !== null) {
-            $notification->body("Total pending: " . count($this->pendingChanges) . " cards | Price: $" . number_format($this->customPrice, 2));
+            $notification->body("Total pending: " . count($this->pendingChanges) . " changes | Price: $" . number_format($this->customPrice, 2));
         }
         
         $notification->send();
@@ -376,25 +386,29 @@ class ManageInventory extends Page
             return;
         }
         
-        // Track pending change
+        // Track pending change with foil status as part of the key
         $cardId = $this->modalCardId;
         $cardName = $this->modalCardData['name'] ?? 'Unknown Card';
+        $changeKey = $cardId . ($this->isFoil ? '_foil' : '_normal');
         
-        if (!isset($this->pendingChanges[$cardId])) {
-            $this->pendingChanges[$cardId] = [
+        if (!isset($this->pendingChanges[$changeKey])) {
+            $this->pendingChanges[$changeKey] = [
+                'card_id' => $cardId,
                 'name' => $cardName,
+                'is_foil' => $this->isFoil,
                 'change' => 0,
             ];
         }
         
-        $this->pendingChanges[$cardId]['change'] -= $this->quantityToRemove;
+        $this->pendingChanges[$changeKey]['change'] -= $this->quantityToRemove;
         
         // Force Livewire to detect the change
         $this->pendingChanges = $this->pendingChanges;
         
+        $foilText = $this->isFoil ? ' (Foil)' : '';
         Notification::make()
-            ->title("Queued -{$this->quantityToRemove} from {$cardName}")
-            ->body("Total pending: " . count($this->pendingChanges) . " cards")
+            ->title("Queued -{$this->quantityToRemove} from {$cardName}{$foilText}")
+            ->body("Total pending: " . count($this->pendingChanges) . " changes")
             ->warning()
             ->send();
         
@@ -417,6 +431,7 @@ class ManageInventory extends Page
     public function closeReviewModal(): void
     {
         $this->showReviewModal = false;
+        $this->dispatch('$refresh');
     }
     
     public function applyPendingChanges(): void
@@ -431,9 +446,13 @@ class ManageInventory extends Page
         
         $updatedCount = 0;
         
-        foreach ($this->pendingChanges as $cardId => $change) {
+        foreach ($this->pendingChanges as $changeKey => $change) {
+            $cardId = $change['card_id'];
+            $isFoil = $change['is_foil'] ?? false;
+            
             $inventory = Inventory::where('location_id', $this->selectedLocationId)
                 ->where('card_id', $cardId)
+                ->where('is_foil', $isFoil)
                 ->first();
             
             $currentQty = $inventory?->quantity ?? 0;
@@ -452,6 +471,7 @@ class ManageInventory extends Page
                 [
                     'location_id' => $this->selectedLocationId,
                     'card_id' => $cardId,
+                    'is_foil' => $isFoil,
                 ],
                 $updateData
             );
@@ -465,17 +485,20 @@ class ManageInventory extends Page
             ->send();
         
         $this->pendingChanges = [];
-        $this->closeReviewModal();
+        $this->showReviewModal = false;
+        $this->dispatch('$refresh');
     }
     
     public function cancelPendingChanges(): void
     {
         $this->pendingChanges = [];
-        $this->closeReviewModal();
+        $this->showReviewModal = false;
         
         Notification::make()
             ->title('Changes cancelled')
             ->warning()
             ->send();
+            
+        $this->dispatch('$refresh');
     }
 }
