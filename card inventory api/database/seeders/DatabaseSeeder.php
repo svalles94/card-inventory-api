@@ -17,9 +17,11 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        // Create platform admin user
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'is_platform_admin' => true,
         ]);
     }
 }
