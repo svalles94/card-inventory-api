@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class StoreInventoryResource extends Resource
 {
@@ -23,9 +24,20 @@ class StoreInventoryResource extends Resource
     
     protected static ?int $navigationSort = 1;
 
+    public static function getLatestMarketPrice(string $cardId): ?float
+    {
+        return Cache::remember("card:{$cardId}:latest_market_price", 300, function () use ($cardId) {
+            return Card::find($cardId)?->cardPrices()
+                ->whereNotNull('market_price')
+                ->orderBy('updated_at', 'desc')
+                ->value('market_price');
+        });
+    }
+
     public static function form(Form $form): Form
     {
         $currentStore = auth()->user()->currentStore();
+        $currentLocationId = auth()->user()->currentLocation()?->id;
         
         if (!$currentStore) {
             return $form->schema([]);
@@ -40,7 +52,9 @@ class StoreInventoryResource extends Resource
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->label('Location'),
+                            ->default($currentLocationId)
+                            ->label('Location')
+                            ->helperText($currentLocationId ? 'Defaulted from your selected location' : 'Pick a location for this inventory item'),
                         Forms\Components\Select::make('card_id')
                             ->relationship('card', 'name')
                             ->required()
@@ -54,7 +68,19 @@ class StoreInventoryResource extends Resource
                                     ->icon('heroicon-o-magnifying-glass')
                                     ->url(\App\Filament\Store\Resources\StoreCardResource::getUrl('index'))
                                     ->openUrlInNewTab()
-                            ),
+                            )
+                            ->reactive()
+                            ->afterStateUpdated(function (callable $set, $state) {
+                                if (! $state) {
+                                    return;
+                                }
+
+                                $latest = static::getLatestMarketPrice($state);
+
+                                if ($latest !== null) {
+                                    $set('market_price', $latest);
+                                }
+                            }),
                     ])->columns(2),
                     
                 Forms\Components\Section::make('Quantity')
@@ -103,7 +129,15 @@ class StoreInventoryResource extends Resource
                             ->numeric()
                             ->prefix('$')
                             ->label('Market Price')
-                            ->helperText('Current market value'),
+                            ->helperText('Current market value')
+                            ->default(function (callable $get) {
+                                $cardId = $get('card_id');
+                                if (! $cardId) {
+                                    return null;
+                                }
+
+                                return static::getLatestMarketPrice($cardId);
+                            }),
                     ])->columns(3),
             ]);
     }
