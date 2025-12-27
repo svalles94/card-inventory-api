@@ -71,6 +71,15 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Locations the user is explicitly assigned to (optional scoping inside a store).
+     */
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(Location::class, 'location_user')
+            ->withTimestamps();
+    }
+
+    /**
      * Get all store role assignments
      */
     public function storeRoles()
@@ -106,6 +115,14 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Check if user can access a location (must belong to its store).
+     */
+    public function canAccessLocation(Location $location): bool
+    {
+        return $this->canAccessStore($location->store);
+    }
+
+    /**
      * Get the current store from session
      */
     public function currentStore(): ?Store
@@ -121,6 +138,36 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return $store;
+    }
+
+    /**
+     * Get the current location from session, ensuring it belongs to the current store.
+     */
+    public function currentLocation(): ?Location
+    {
+        $locationId = session('current_location_id');
+
+        if (!$locationId) {
+            return null;
+        }
+
+        $location = Location::with('store')->find($locationId);
+
+        if (!$location) {
+            return null;
+        }
+
+        $currentStore = $this->currentStore();
+
+        if (!$currentStore || $location->store_id !== $currentStore->id) {
+            return null;
+        }
+
+        if (! $this->canAccessLocation($location)) {
+            return null;
+        }
+
+        return $location;
     }
 
     /**

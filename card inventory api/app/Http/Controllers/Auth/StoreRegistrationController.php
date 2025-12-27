@@ -67,7 +67,9 @@ class StoreRegistrationController extends Controller
         // Set current store in session
         session(['current_store_id' => $store->id]);
 
-        return redirect()->route('filament.store.pages.dashboard');
+        // Redirect to the store panel root (avoids missing route name issues)
+        $storePanelUrl = filament()->getPanel('store')->getUrl();
+        return redirect()->to($storePanelUrl ?? '/store');
     }
 }
 

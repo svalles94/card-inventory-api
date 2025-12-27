@@ -17,7 +17,11 @@ class CreateStoreInventory extends CreateRecord
         // Pre-fill card_id if provided in query string
         $cardId = request()->query('card_id');
         if ($cardId) {
-            $this->form->fill(['card_id' => $cardId]);
+            $market = StoreInventoryResource::getLatestMarketPrice($cardId);
+            $this->form->fill([
+                'card_id' => $cardId,
+                'market_price' => $market,
+            ]);
         }
     }
 

@@ -2,15 +2,19 @@
 
 namespace App\Filament\Store\Pages;
 
+use App\Models\Store;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
+use Filament\Pages\Concerns\InteractsWithFormActions;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Store;
-use Filament\Notifications\Notification;
 
 class StoreSettings extends Page
 {
+    use InteractsWithFormActions;
+
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
     
     protected static string $view = 'filament.store.pages.store-settings';
@@ -120,9 +124,9 @@ class StoreSettings extends Page
     protected function getFormActions(): array
     {
         return [
-            Forms\Components\Actions\Action::make('save')
+            Action::make('save')
                 ->label('Save Settings')
-                ->submit('save')
+                ->action('save')
                 ->keyBindings(['mod+s'])
                 ->color('primary'),
         ];
