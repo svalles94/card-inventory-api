@@ -21,3 +21,12 @@ Route::post('/register', [StoreRegistrationController::class, 'register'])
 Route::post('/store/switch-location', SwitchLocationController::class)
     ->middleware(['auth', \App\Http\Middleware\SetCurrentStore::class])
     ->name('store.switch-location');
+
+// Store cards grid view
+Route::get('/store/cards/grid', [\App\Http\Controllers\Store\CardGridController::class, 'index'])
+    ->middleware(['auth', 'verified', \App\Http\Middleware\SetCurrentStore::class])
+    ->name('store.cards.grid');
+
+Route::post('/store/cards/add-to-queue', [\App\Http\Controllers\Store\CardGridController::class, 'addToQueue'])
+    ->middleware(['auth', 'verified', \App\Http\Middleware\SetCurrentStore::class])
+    ->name('store.cards.add-to-queue');

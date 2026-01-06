@@ -389,7 +389,8 @@ class StoreCardResource extends Resource
                     })
                     ->deselectRecordsAfterCompletion(),
             ])
-            ->paginationPageOptions([12, 24, 48]);
+            ->paginationPageOptions([24, 48, 96, 192])
+            ->defaultPaginationPageOption(48);
     }
 
     public static function getRelations(): array

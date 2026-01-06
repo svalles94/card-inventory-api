@@ -13,6 +13,8 @@ class ListStoreCards extends ListRecords
 
     public string $viewMode = 'list';
 
+    protected static string $view = 'filament.store.resources.store-card-resource.pages.list-store-cards';
+
     protected $queryString = [
         'viewMode' => ['except' => 'list'],
     ];
@@ -30,32 +32,36 @@ class ListStoreCards extends ListRecords
 
     protected function getTableContentGrid(): ?array
     {
-        return $this->viewMode === 'grid'
-            ? [
-                'md' => 2,
-                'lg' => 3,
-                'xl' => 4,
-            ]
-            : null;
+        // Don't use Filament's grid - we have our own custom grid view
+        return null;
     }
 
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('toggle_view')
-                ->label(fn () => $this->viewMode === 'grid' ? 'Switch to List' : 'Switch to Grid')
-                ->icon(fn () => $this->viewMode === 'grid' ? 'heroicon-o-list-bullet' : 'heroicon-o-rectangle-group')
-                ->color('gray')
-                ->action(function () {
-                    $this->viewMode = $this->viewMode === 'grid' ? 'list' : 'grid';
-                    Session::put('cards_view_mode', $this->viewMode);
-                }),
             Actions\Action::make('review_queue')
                 ->label('Queued Updates')
                 ->icon('heroicon-o-clipboard-document-list')
                 ->color('primary')
                 ->url(\App\Filament\Store\Pages\InventoryUpdateQueuePage::getUrl()),
         ];
+    }
+
+    public function queueUpdateFromGrid(string $cardId): void
+    {
+        $card = \App\Models\Card::find($cardId);
+        if (!$card) {
+            \Filament\Notifications\Notification::make()
+                ->title('Card not found')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        // Mount the queue_update table action for this card
+        $this->mountedTableAction = 'queue_update';
+        $this->mountedTableActionRecord = $card->id;
+        $this->mountTableAction('queue_update', $card->id);
     }
 }
 

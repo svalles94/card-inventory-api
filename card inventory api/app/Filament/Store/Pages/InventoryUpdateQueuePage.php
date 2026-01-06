@@ -86,9 +86,14 @@ class InventoryUpdateQueuePage extends Page implements HasForms
                 'set_code' => $setCode,
                 'card_number' => $cardNumber,
                 'is_foil' => $isFoil,
+                'buy_price' => $item['buy_price'] ?? $current?->buy_price ?? null,
             ]);
         }
 
+        // Store items in data array for custom table view
+        $this->data['items'] = array_values($hydrated);
+        
+        // Also fill form for compatibility
         $this->form->fill([
             'items' => array_values($hydrated),
         ]);
@@ -220,7 +225,8 @@ class InventoryUpdateQueuePage extends Page implements HasForms
 
         $locations = $store->locations()->pluck('id')->all();
 
-        $items = Arr::get($this->form->getState(), 'items', []);
+        // Get items from data array (from custom table view)
+        $items = $this->data['items'] ?? [];
 
         foreach ($items as $item) {
             $cardId = $item['card_id'] ?? null;
@@ -232,7 +238,8 @@ class InventoryUpdateQueuePage extends Page implements HasForms
             }
 
             $delta = (int) ($item['delta_quantity'] ?? 0);
-            $sellPriceInput = $item['sell_price'] !== '' ? (float) $item['sell_price'] : null;
+            $sellPriceInput = isset($item['sell_price']) && $item['sell_price'] !== '' && $item['sell_price'] !== null ? (float) $item['sell_price'] : null;
+            $buyPriceInput = isset($item['buy_price']) && $item['buy_price'] !== '' && $item['buy_price'] !== null ? (float) $item['buy_price'] : null;
 
             $currentQuery = \App\Models\Inventory::where('card_id', $cardId)
                 ->where('location_id', $locationId)
@@ -247,6 +254,7 @@ class InventoryUpdateQueuePage extends Page implements HasForms
             $currentQty = $currentInv?->quantity ?? 0;
             $newQty = max(0, $currentQty + $delta);
             $sellPriceFinal = $sellPriceInput ?? $currentInv?->sell_price;
+            $buyPriceFinal = $buyPriceInput ?? $currentInv?->buy_price;
 
             Inventory::updateOrCreate(
                 [
@@ -258,6 +266,7 @@ class InventoryUpdateQueuePage extends Page implements HasForms
                 [
                     'quantity' => $newQty,
                     'sell_price' => $sellPriceFinal,
+                    'buy_price' => $buyPriceFinal,
                 ]
             );
         }
@@ -267,6 +276,24 @@ class InventoryUpdateQueuePage extends Page implements HasForms
         Notification::make()->success()->title('Queued updates applied')->send();
 
         $this->redirect(\App\Filament\Store\Resources\StoreCardResource::getUrl('index'));
+    }
+
+    public function removeItem(int $index): void
+    {
+        $items = $this->data['items'] ?? [];
+        
+        if (isset($items[$index])) {
+            unset($items[$index]);
+            $this->data['items'] = array_values($items); // Reindex array
+            
+            // Also update session queue
+            $queueItems = QueueStore::all();
+            $keys = array_keys($queueItems);
+            if (isset($keys[$index])) {
+                unset($queueItems[$keys[$index]]);
+                \Illuminate\Support\Facades\Session::put(QueueStore::key(), $queueItems);
+            }
+        }
     }
 
     protected function getHeaderActions(): array
