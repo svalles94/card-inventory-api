@@ -15,6 +15,10 @@ class ViewStoreCard extends ViewRecord
     protected static string $view = 'filament.store.resources.store-card-resource.pages.view-store-card';
     
     public ?string $selectedEditionId = null;
+    
+    protected $queryString = [
+        'selectedEditionId' => ['except' => null],
+    ];
 
     protected function getHeaderActions(): array
     {
@@ -47,6 +51,12 @@ class ViewStoreCard extends ViewRecord
             ->orderByDesc('last_update')
             ->value('id');
         $this->selectedEditionId = $defaultEdition;
+    }
+    
+    public function updatedSelectedEditionId($value): void
+    {
+        // This will trigger a re-render to show orientations for the selected edition
+        // The form will automatically refresh because of the key() method on the Placeholder
     }
     
     public function getFoilPrice(): ?float
@@ -166,6 +176,65 @@ class ViewStoreCard extends ViewRecord
         
         // Fallback to edition market_price
         return $edition->market_price;
+    }
+    
+    public function getCardOrientations()
+    {
+        // Try selected edition first, then fall back to latest edition, then card
+        $edition = null;
+        if ($this->selectedEditionId) {
+            $edition = Edition::find($this->selectedEditionId);
+        }
+        
+        if (!$edition) {
+            $edition = $this->record->editions()
+                ->orderByDesc('last_update')
+                ->first();
+        }
+        
+        if (!$edition) {
+            return [];
+        }
+        
+        $orientations = [];
+        
+        // Add primary orientation (main card image)
+        $primaryImage = $edition->image_url;
+        if (!$primaryImage) {
+            // Fallback to card image
+            $primaryImage = $this->record->image_url;
+        }
+        
+        if ($primaryImage) {
+            $orientations[] = [
+                'name' => $edition->orientation ?? 'Front',
+                'image' => $primaryImage,
+                'is_primary' => true,
+            ];
+        }
+        
+        // Add other orientations (flip sides)
+        if ($edition->other_orientations && is_array($edition->other_orientations)) {
+            foreach ($edition->other_orientations as $orientationData) {
+                if (isset($orientationData['edition']['image'])) {
+                    $imageUrl = $orientationData['edition']['image'];
+                    // Convert to full URL if needed
+                    if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                        $baseUrl = rtrim('https://api.gatcg.com', '/');
+                        $imagePath = ltrim($imageUrl, '/');
+                        $imageUrl = $baseUrl . '/' . $imagePath;
+                    }
+                    
+                    $orientations[] = [
+                        'name' => $orientationData['name'] ?? 'Flip Side',
+                        'image' => $imageUrl,
+                        'is_primary' => false,
+                    ];
+                }
+            }
+        }
+        
+        return $orientations;
     }
 }
 

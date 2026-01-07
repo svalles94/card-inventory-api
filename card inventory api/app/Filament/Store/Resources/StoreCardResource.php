@@ -44,6 +44,7 @@ class StoreCardResource extends Resource
                         Forms\Components\Placeholder::make('image_url')
                             ->label('Card Image')
                             ->content(function (Card $record): HtmlString {
+                                // Default to card image - orientations will be shown in custom view
                                 $imageUrl = $record->image_url ?? '/images/card-placeholder.png';
                                 return new HtmlString(
                                     '<a href="' . htmlspecialchars($imageUrl) . '" target="_blank">'
@@ -147,7 +148,7 @@ class StoreCardResource extends Resource
                             ->where('sub_type_name', 'like', '%foil%')
                             ->orderByDesc('updated_at')
                             ->first();
-                        
+
                         return $foilPrice?->market_price;
                     })
                     ->money('USD')
@@ -184,7 +185,7 @@ class StoreCardResource extends Resource
                             ->where('sub_type_name', 'not like', '%foil%')
                             ->orderByDesc('updated_at')
                             ->first();
-                        
+
                         return $nonFoilPrice?->market_price;
                     })
                     ->money('USD')

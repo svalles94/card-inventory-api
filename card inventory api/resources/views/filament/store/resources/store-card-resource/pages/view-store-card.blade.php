@@ -3,6 +3,63 @@
 @endphp
 
 <x-filament-panels::page>
+    {{-- Card Images with Orientations (Flip Cards) - At the top --}}
+    @php
+        $orientations = $this->getCardOrientations();
+    @endphp
+    @if(!empty($orientations))
+        <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Card Images</h3>
+            
+            @if(count($orientations) > 1)
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">This card has multiple sides (flip card). All sides share the same inventory.</p>
+            @endif
+            
+            {{-- Edition Selector --}}
+            @if($this->getAvailableEditions()->count() > 1)
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Select Edition
+                    </label>
+                    <select 
+                        wire:model.live="selectedEditionId"
+                        class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm focus:border-primary-500 focus:ring-primary-500"
+                    >
+                        @foreach($this->getAvailableEditions() as $edition)
+                            <option value="{{ $edition->id }}" {{ $this->selectedEditionId == $edition->id ? 'selected' : '' }}>
+                                {{ $this->getEditionLabel($edition) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+            
+            {{-- Card Images Grid --}}
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                @foreach($orientations as $orientation)
+                    <div class="text-center">
+                        @if(count($orientations) > 1)
+                            <div class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                {{ $orientation['name'] }}
+                                @if($orientation['is_primary'])
+                                    <span class="ml-1 text-xs text-primary-600 dark:text-primary-400">(Primary)</span>
+                                @endif
+                            </div>
+                        @endif
+                        <a href="{{ $orientation['image'] }}" target="_blank">
+                            <img 
+                                src="{{ $orientation['image'] }}" 
+                                alt="{{ $orientation['name'] }}"
+                                class="w-full max-w-[150px] rounded-lg shadow-lg mx-auto"
+                                loading="lazy"
+                            />
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+    
     {{-- Standard Filament View Form --}}
     {{ $this->form }}
     
