@@ -77,21 +77,11 @@ class StoreCardResource extends Resource
                     ->columns(4),
                 Forms\Components\Section::make('Pricing')
                     ->schema([
-                        Forms\Components\Placeholder::make('market_price')
-                            ->label('Market Price')
-                            ->content(function (Card $record): string {
-                                $latestPrice = $record->cardPrices()
-                                    ->whereNotNull('market_price')
-                                    ->orderBy('updated_at', 'desc')
-                                    ->first();
-
-                                return $latestPrice ? '$' . number_format($latestPrice->market_price, 2) : 'N/A';
-                            }),
                         Forms\Components\Placeholder::make('editions_count')
-                            ->label('Editions')
+                            ->label('Total Editions')
                             ->content(fn (Card $record): string => (string) $record->editions()->count()),
                     ])
-                    ->columns(2),
+                    ->columns(1),
             ]);
     }
 
@@ -126,23 +116,80 @@ class StoreCardResource extends Resource
                 Tables\Columns\TextColumn::make('classes')
                     ->label('Classes')
                     ->visible(false),
-                Tables\Columns\TextColumn::make('market_price')
-                    ->label('Market Price')
-                    ->state(function (Card $record): ?float {
-                        $latestPrice = $record->cardPrices()
+                Tables\Columns\TextColumn::make('foil_market_price')
+                    ->label('TCGPlayer Market (Foil)')
+                    ->state(function (Card $record, $livewire): ?float {
+                        $editionId = $livewire->selectedEditionId ?? null;
+                        
+                        if ($editionId) {
+                            $edition = Edition::find($editionId);
+                            if ($edition) {
+                                $price = $edition->cardPrices()
+                                    ->whereNotNull('market_price')
+                                    ->where('sub_type_name', 'like', '%foil%')
+                                    ->orderByDesc('updated_at')
+                                    ->first();
+                                
+                                if ($price) {
+                                    return $price->market_price;
+                                }
+                                
+                                // Fallback to edition market_price
+                                if ($edition->market_price !== null) {
+                                    return $edition->market_price;
+                                }
+                            }
+                        }
+                        
+                        // Fallback to card-level foil price
+                        $foilPrice = $record->cardPrices()
                             ->whereNotNull('market_price')
-                            ->orderBy('updated_at', 'desc')
+                            ->where('sub_type_name', 'like', '%foil%')
+                            ->orderByDesc('updated_at')
                             ->first();
-
-                        return $latestPrice?->market_price;
+                        
+                        return $foilPrice?->market_price;
                     })
                     ->money('USD')
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        return $query->join('card_prices', 'cards.id', '=', 'card_prices.card_id')
-                            ->select('cards.*')
-                            ->orderBy('card_prices.market_price', $direction)
-                            ->groupBy('cards.id');
-                    }),
+                    ->placeholder('N/A')
+                    ->visible(fn ($livewire): bool => ($livewire->viewMode ?? 'list') === 'list'),
+                Tables\Columns\TextColumn::make('nonfoil_market_price')
+                    ->label('TCGPlayer Market (Non-Foil)')
+                    ->state(function (Card $record, $livewire): ?float {
+                        $editionId = $livewire->selectedEditionId ?? null;
+                        
+                        if ($editionId) {
+                            $edition = Edition::find($editionId);
+                            if ($edition) {
+                                $price = $edition->cardPrices()
+                                    ->whereNotNull('market_price')
+                                    ->where('sub_type_name', 'not like', '%foil%')
+                                    ->orderByDesc('updated_at')
+                                    ->first();
+                                
+                                if ($price) {
+                                    return $price->market_price;
+                                }
+                                
+                                // Fallback to edition market_price
+                                if ($edition->market_price !== null) {
+                                    return $edition->market_price;
+                                }
+                            }
+                        }
+                        
+                        // Fallback to card-level non-foil price
+                        $nonFoilPrice = $record->cardPrices()
+                            ->whereNotNull('market_price')
+                            ->where('sub_type_name', 'not like', '%foil%')
+                            ->orderByDesc('updated_at')
+                            ->first();
+                        
+                        return $nonFoilPrice?->market_price;
+                    })
+                    ->money('USD')
+                    ->placeholder('N/A')
+                    ->visible(fn ($livewire): bool => ($livewire->viewMode ?? 'list') === 'list'),
                 Tables\Columns\TextColumn::make('editions_count')
                     ->label('Editions')
                     ->counts('editions')

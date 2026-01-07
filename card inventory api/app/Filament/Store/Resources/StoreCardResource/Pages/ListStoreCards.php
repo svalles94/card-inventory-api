@@ -6,17 +6,22 @@ use App\Filament\Store\Resources\StoreCardResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Facades\Session;
+use App\Models\Edition;
 
 class ListStoreCards extends ListRecords
 {
     protected static string $resource = StoreCardResource::class;
 
     public string $viewMode = 'list';
+    public ?string $selectedEditionId = null;
+    public bool $showFoilPrices = true;
 
     protected static string $view = 'filament.store.resources.store-card-resource.pages.list-store-cards';
 
     protected $queryString = [
         'viewMode' => ['except' => 'list'],
+        'selectedEditionId' => ['except' => null],
+        'showFoilPrices' => ['except' => true],
     ];
 
     public function mount(): void
@@ -28,6 +33,44 @@ class ListStoreCards extends ListRecords
     public function updatedViewMode(string $value): void
     {
         Session::put('cards_view_mode', $value);
+    }
+    
+    public function updatedSelectedEditionId(): void
+    {
+        // Reset table when edition changes
+        $this->resetTable();
+    }
+    
+    public function getAvailableEditions()
+    {
+        // Get all editions that have cards
+        // This is simpler and performs well since editions are relatively few
+        return Edition::query()
+            ->whereHas('card')
+            ->with('set')
+            ->orderBy('collector_number')
+            ->orderBy('slug')
+            ->get();
+    }
+    
+    public function getEditionLabel(Edition $edition): string
+    {
+        // Match the pattern used in StoreCardResource
+        $rarityText = match ($edition->rarity) {
+            1 => 'Common',
+            2 => 'Uncommon',
+            3 => 'Rare',
+            4 => 'Super Rare',
+            default => '—',
+        };
+
+        $label = trim(implode(' · ', array_filter([
+            $edition->slug,
+            $edition->collector_number,
+            $rarityText,
+        ])));
+
+        return $label ?: $edition->id;
     }
 
     protected function getTableContentGrid(): ?array

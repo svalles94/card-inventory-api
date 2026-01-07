@@ -152,7 +152,7 @@ class InventoryUpdateQueuePage extends Page implements HasForms
                         ->label('Foil')
                         ->content(fn (callable $get): string => $get('is_foil') ? 'Foil' : 'Normal'),
                     Forms\Components\Placeholder::make('market_price')
-                        ->label('Market Price')
+                        ->label('TCGPlayer Market Price')
                         ->content(function (callable $get): string {
                             $editionId = $get('edition_id');
                             $isFoil = (bool) $get('is_foil');
@@ -205,10 +205,26 @@ class InventoryUpdateQueuePage extends Page implements HasForms
                         ->label('Resulting Qty')
                         ->content(fn (callable $get) => (string) max(0, (int) ($get('current_quantity') ?? 0) + (int) ($get('delta_quantity') ?? 0))),
                     Forms\Components\TextInput::make('sell_price')
-                        ->label('Sell Price')
+                        ->label('Your Price (Optional)')
                         ->numeric()
                         ->prefix('$')
-                        ->nullable(),
+                        ->nullable()
+                        ->helperText(function (callable $get) {
+                            $current = Inventory::where('card_id', $get('card_id'))
+                                ->where('location_id', $get('location_id'))
+                                ->where('is_foil', (bool) $get('is_foil'))
+                                ->first();
+                            
+                            if ($current?->sell_price) {
+                                return "Current price: $" . number_format($current->sell_price, 2) . ". Leave empty to keep current price.";
+                            }
+                            
+                            return "Leave empty if you don't want to set a price yet.";
+                        })
+                        ->visible(function (callable $get) {
+                            // Always show, but helper text explains it's optional
+                            return true;
+                        }),
                 ])
                 ->columns(5)
                 ->columnSpanFull(),

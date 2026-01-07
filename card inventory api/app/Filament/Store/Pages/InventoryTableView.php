@@ -85,11 +85,11 @@ class InventoryTableView extends Page implements HasTable
                         default => 'success',
                     }),
                 Tables\Columns\TextColumn::make('sell_price')
-                    ->label('Sell')
+                    ->label('Your Price')
                     ->money('USD')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('market_price')
-                    ->label('Market')
+                    ->label('TCGPlayer Market')
                     ->money('USD')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -128,8 +128,8 @@ class InventoryTableView extends Page implements HasTable
 
                         $callback = function () {
                             $output = fopen('php://output', 'w');
-                            fputcsv($output, ['card_number', 'set_code', 'foil', 'quantity', 'sell_price', 'location_name(optional)']);
-                            fputcsv($output, ['123', 'LOR', 'false', '5', '9.99', 'Main Store']);
+                            fputcsv($output, ['card_name', 'set_code', 'collector_number', 'edition_slug', 'is_foil', 'quantity', 'quantity_mode', 'buy_price', 'sell_price', 'location_name']);
+                            fputcsv($output, ['Lightning Bolt', 'LOR', '001', 'standard', 'FALSE', '5', 'add', '2.50', '9.99', 'Main Store']);
                             fclose($output);
                         };
 
@@ -145,7 +145,7 @@ class InventoryTableView extends Page implements HasTable
                             ->acceptedFileTypes(['text/csv', 'text/plain'])
                             ->directory('tmp')
                             ->required()
-                            ->helperText('Columns: card_number, set_code, foil (true/false), quantity, sell_price, location_name(optional)')
+                            ->helperText('CSV format: card_name, set_code, collector_number (optional), edition_slug (optional), is_foil (TRUE/FALSE), quantity, quantity_mode (add/replace), buy_price (optional), sell_price (optional), location_name (optional)')
                             ->maxSize(1024),
                     ])
                     ->action(function (array $data) {
@@ -172,11 +172,11 @@ class InventoryTableView extends Page implements HasTable
                         }
 
                         $header = fgetcsv($handle);
-                        $required = ['card_number', 'set_code', 'foil', 'quantity'];
+                        $required = ['card_name', 'set_code', 'is_foil', 'quantity'];
 
                         if (! $header || count(array_intersect($required, $header)) < count($required)) {
                             fclose($handle);
-                            Notification::make()->danger()->title('CSV header missing required columns')->send();
+                            Notification::make()->danger()->title('CSV header missing required columns')->body('Required: card_name, set_code, is_foil, quantity')->send();
                             return;
                         }
 
@@ -194,29 +194,61 @@ class InventoryTableView extends Page implements HasTable
                                 continue;
                             }
 
-                            $cardNumber = trim($record['card_number'] ?? '');
+                            // Parse required fields
+                            $cardName = trim($record['card_name'] ?? '');
                             $setCode = strtoupper(trim($record['set_code'] ?? ''));
-                            $foil = filter_var($record['foil'] ?? false, FILTER_VALIDATE_BOOLEAN);
-                            $quantity = (int) ($record['quantity'] ?? 0);
-                            $sellPrice = $record['sell_price'] !== '' ? (float) $record['sell_price'] : null;
-                            $locationName = trim($record['location_name(optional)'] ?? '');
+                            $isFoil = filter_var($record['is_foil'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                            $quantity = !empty($record['quantity']) ? (int) $record['quantity'] : null;
+                            $quantityMode = strtolower(trim($record['quantity_mode'] ?? 'add')); // 'add' or 'replace'
+                            
+                            // Optional fields
+                            $collectorNumber = trim($record['collector_number'] ?? '');
+                            $editionSlug = trim($record['edition_slug'] ?? '');
+                            $buyPrice = !empty($record['buy_price']) ? (float) $record['buy_price'] : null;
+                            $sellPrice = !empty($record['sell_price']) ? (float) $record['sell_price'] : null;
+                            $locationName = trim($record['location_name'] ?? '');
 
-                            if (! $cardNumber || ! $setCode || $quantity <= 0) {
+                            if (! $cardName || ! $setCode) {
                                 $failed++;
                                 continue;
                             }
 
-                            $card = Card::where('card_number', $cardNumber)
-                                ->where('set_code', $setCode)
-                                ->first();
+                            // Find card
+                            $cardQuery = Card::where('name', $cardName)
+                                ->where('set_code', $setCode);
+                            
+                            if ($collectorNumber) {
+                                $cardQuery->where('card_number', $collectorNumber);
+                            }
+                            
+                            $card = $cardQuery->first();
 
                             if (! $card) {
                                 $failed++;
                                 continue;
                             }
 
-                            $location = $user->currentLocation();
+                            // Find edition if specified
+                            $editionId = null;
+                            if ($editionSlug) {
+                                $edition = $card->editions()
+                                    ->where('slug', $editionSlug)
+                                    ->first();
+                                if ($edition) {
+                                    $editionId = $edition->id;
+                                }
+                            } else {
+                                // Default to latest edition
+                                $latestEdition = $card->editions()
+                                    ->orderByDesc('last_update')
+                                    ->first();
+                                if ($latestEdition) {
+                                    $editionId = $latestEdition->id;
+                                }
+                            }
 
+                            // Determine location
+                            $location = $user->currentLocation();
                             if ($locationName !== '') {
                                 $location = $store->locations()->where('name', $locationName)->first();
                             }
@@ -226,16 +258,50 @@ class InventoryTableView extends Page implements HasTable
                                 continue;
                             }
 
+                            // Skip if quantity is empty (allows price-only updates)
+                            if ($quantity === null) {
+                                // Only update prices if provided
+                                if ($buyPrice !== null || $sellPrice !== null) {
+                                    $existingInventory = Inventory::where('card_id', $card->id)
+                                        ->where('location_id', $location->id)
+                                        ->where('is_foil', $isFoil)
+                                        ->when($editionId, fn($q) => $q->where('edition_id', $editionId))
+                                        ->first();
+                                    
+                                    if ($existingInventory) {
+                                        if ($buyPrice !== null) $existingInventory->buy_price = $buyPrice;
+                                        if ($sellPrice !== null) $existingInventory->sell_price = $sellPrice;
+                                        $existingInventory->save();
+                                        $success++;
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Find or create inventory
                             $inventory = Inventory::firstOrNew([
-                                'location_id' => $location->id,
                                 'card_id' => $card->id,
-                                'is_foil' => $foil,
+                                'location_id' => $location->id,
+                                'edition_id' => $editionId,
+                                'is_foil' => $isFoil,
                             ]);
 
-                            $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                            // Handle quantity mode
+                            if ($quantityMode === 'add') {
+                                $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                            } else {
+                                // 'replace' mode
+                                $inventory->quantity = $quantity;
+                            }
+
+                            // Update prices if provided
+                            if ($buyPrice !== null) {
+                                $inventory->buy_price = $buyPrice;
+                            }
                             if ($sellPrice !== null) {
                                 $inventory->sell_price = $sellPrice;
                             }
+
                             $inventory->save();
                             $success++;
                         }
@@ -257,8 +323,8 @@ class InventoryTableView extends Page implements HasTable
                         \Filament\Forms\Components\Textarea::make('rows')
                             ->rows(10)
                             ->required()
-                            ->helperText('Paste rows: card_number,set_code,foil,quantity,sell_price,location_name(optional). One row per line. Tabs or commas are accepted.')
-                            ->placeholder("123\tLOR\tfalse\t5\t9.99\tMain Store"),
+                            ->helperText('Paste rows: card_name,set_code,collector_number,edition_slug,is_foil,quantity,quantity_mode,buy_price,sell_price,location_name. One row per line. Tabs or commas are accepted.')
+                            ->placeholder("Lightning Bolt\tLOR\t001\tstandard\tFALSE\t5\tadd\t2.50\t9.99\tMain Store"),
                     ])
                     ->action(function (array $data) {
                         $user = Auth::user();
@@ -282,33 +348,79 @@ class InventoryTableView extends Page implements HasTable
                                 continue;
                             }
 
-                            [$cardNumber, $setCode, $foilRaw, $qtyRaw] = [$parts[0], $parts[1], $parts[2], $parts[3]];
-                            $sellPrice = $parts[4] ?? null;
-                            $locationName = $parts[5] ?? '';
+                            // Parse fields (support both old and new format)
+                            $cardName = trim($parts[0] ?? '');
+                            $setCode = strtoupper(trim($parts[1] ?? ''));
+                            $isFoil = false;
+                            $quantity = null;
+                            $quantityMode = 'add';
+                            $collectorNumber = '';
+                            $editionSlug = '';
+                            $buyPrice = null;
+                            $sellPrice = null;
+                            $locationName = '';
 
-                            $cardNumber = trim($cardNumber);
-                            $setCode = strtoupper(trim($setCode));
-                            $foil = filter_var($foilRaw, FILTER_VALIDATE_BOOLEAN);
-                            $quantity = (int) $qtyRaw;
-                            $sellPrice = $sellPrice !== '' ? (float) $sellPrice : null;
-                            $locationName = trim($locationName);
-
-                            if (! $cardNumber || ! $setCode || $quantity <= 0) {
-                                $failed++;
-                                continue;
+                            // Detect format: if 3rd field looks like boolean, it's old format
+                            if (count($parts) >= 4 && in_array(strtolower(trim($parts[2])), ['true', 'false', '0', '1'])) {
+                                // Old format: card_number, set_code, foil, quantity, sell_price, location_name
+                                $cardNumber = trim($parts[0]);
+                                $setCode = strtoupper(trim($parts[1]));
+                                $isFoil = filter_var($parts[2], FILTER_VALIDATE_BOOLEAN);
+                                $quantity = (int) ($parts[3] ?? 0);
+                                $sellPrice = !empty($parts[4]) ? (float) $parts[4] : null;
+                                $locationName = trim($parts[5] ?? '');
+                                
+                                $card = Card::where('card_number', $cardNumber)
+                                    ->where('set_code', $setCode)
+                                    ->first();
+                            } else {
+                                // New format: card_name, set_code, collector_number, edition_slug, is_foil, quantity, quantity_mode, buy_price, sell_price, location_name
+                                $cardName = trim($parts[0]);
+                                $setCode = strtoupper(trim($parts[1]));
+                                $collectorNumber = trim($parts[2] ?? '');
+                                $editionSlug = trim($parts[3] ?? '');
+                                $isFoil = filter_var($parts[4] ?? false, FILTER_VALIDATE_BOOLEAN);
+                                $quantity = !empty($parts[5]) ? (int) $parts[5] : null;
+                                $quantityMode = strtolower(trim($parts[6] ?? 'add'));
+                                $buyPrice = !empty($parts[7]) ? (float) $parts[7] : null;
+                                $sellPrice = !empty($parts[8]) ? (float) $parts[8] : null;
+                                $locationName = trim($parts[9] ?? '');
+                                
+                                $cardQuery = Card::where('name', $cardName)
+                                    ->where('set_code', $setCode);
+                                
+                                if ($collectorNumber) {
+                                    $cardQuery->where('card_number', $collectorNumber);
+                                }
+                                
+                                $card = $cardQuery->first();
                             }
-
-                            $card = Card::where('card_number', $cardNumber)
-                                ->where('set_code', $setCode)
-                                ->first();
 
                             if (! $card) {
                                 $failed++;
                                 continue;
                             }
 
-                            $location = $user->currentLocation();
+                            // Find edition if specified (new format only)
+                            $editionId = null;
+                            if ($editionSlug) {
+                                $edition = $card->editions()
+                                    ->where('slug', $editionSlug)
+                                    ->first();
+                                if ($edition) {
+                                    $editionId = $edition->id;
+                                }
+                            } else {
+                                // Default to latest edition
+                                $latestEdition = $card->editions()
+                                    ->orderByDesc('last_update')
+                                    ->first();
+                                if ($latestEdition) {
+                                    $editionId = $latestEdition->id;
+                                }
+                            }
 
+                            $location = $user->currentLocation();
                             if ($locationName !== '') {
                                 $location = $store->locations()->where('name', $locationName)->first();
                             }
@@ -318,16 +430,46 @@ class InventoryTableView extends Page implements HasTable
                                 continue;
                             }
 
+                            if ($quantity === null || $quantity <= 0) {
+                                // Price-only update
+                                if ($buyPrice !== null || $sellPrice !== null) {
+                                    $existingInventory = Inventory::where('card_id', $card->id)
+                                        ->where('location_id', $location->id)
+                                        ->where('is_foil', $isFoil)
+                                        ->when($editionId, fn($q) => $q->where('edition_id', $editionId))
+                                        ->first();
+                                    
+                                    if ($existingInventory) {
+                                        if ($buyPrice !== null) $existingInventory->buy_price = $buyPrice;
+                                        if ($sellPrice !== null) $existingInventory->sell_price = $sellPrice;
+                                        $existingInventory->save();
+                                        $success++;
+                                    }
+                                }
+                                continue;
+                            }
+
                             $inventory = Inventory::firstOrNew([
-                                'location_id' => $location->id,
                                 'card_id' => $card->id,
-                                'is_foil' => $foil,
+                                'location_id' => $location->id,
+                                'edition_id' => $editionId,
+                                'is_foil' => $isFoil,
                             ]);
 
-                            $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                            // Handle quantity mode
+                            if ($quantityMode === 'add') {
+                                $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                            } else {
+                                $inventory->quantity = $quantity;
+                            }
+
+                            if ($buyPrice !== null) {
+                                $inventory->buy_price = $buyPrice;
+                            }
                             if ($sellPrice !== null) {
                                 $inventory->sell_price = $sellPrice;
                             }
+
                             $inventory->save();
                             $success++;
                         }

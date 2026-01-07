@@ -6,20 +6,40 @@
     {{-- GRID VIEW: True card grid like screenshot --}}
     <x-filament-panels::page>
         <div class="space-y-6">
-            {{-- View Mode Switcher --}}
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
-                <div class="flex gap-1">
-                    <button 
-                        wire:click="$set('viewMode', 'grid')"
-                        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'grid' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
-                        Grid
-                    </button>
-                    <button 
-                        wire:click="$set('viewMode', 'list')"
-                        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'list' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
-                        List
-                    </button>
+            {{-- View Mode Switcher and Edition Selector --}}
+            <div class="flex items-center gap-4 mb-4 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+                    <div class="flex gap-1">
+                        <button 
+                            wire:click="$set('viewMode', 'grid')"
+                            class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'grid' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                            Grid
+                        </button>
+                        <button 
+                            wire:click="$set('viewMode', 'list')"
+                            class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'list' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                            List
+                        </button>
+                    </div>
+                </div>
+                
+                {{-- Edition Selector --}}
+                <div class="flex items-center gap-2">
+                    <label for="edition-select" class="text-sm font-medium text-gray-700 dark:text-gray-300">Edition:</label>
+                    <select 
+                        id="edition-select"
+                        wire:model.live="selectedEditionId"
+                        class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm focus:border-primary-500 focus:ring-primary-500"
+                    >
+                        <option value="">All Editions</option>
+                        @php
+                            $allEditions = $this->getAvailableEditions();
+                        @endphp
+                        @foreach($allEditions as $edition)
+                            <option value="{{ $edition->id }}">{{ $this->getEditionLabel($edition) }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
@@ -65,17 +85,66 @@
                                 </div>
                             @endif
 
-                            {{-- Market Price Badge --}}
+                            {{-- Market Price Badges - Foil and Non-Foil --}}
                             @php
-                                $latestPrice = $card->cardPrices()
-                                    ->whereNotNull('market_price')
-                                    ->orderBy('updated_at', 'desc')
-                                    ->first();
-                                $marketPrice = $latestPrice?->market_price;
+                                $editionId = $this->selectedEditionId;
+                                $foilPrice = null;
+                                $nonFoilPrice = null;
+                                
+                                if ($editionId) {
+                                    $edition = \App\Models\Edition::find($editionId);
+                                    if ($edition) {
+                                        $foilPrice = $edition->cardPrices()
+                                            ->whereNotNull('market_price')
+                                            ->where('sub_type_name', 'like', '%foil%')
+                                            ->orderByDesc('updated_at')
+                                            ->first()?->market_price;
+                                        
+                                        $nonFoilPrice = $edition->cardPrices()
+                                            ->whereNotNull('market_price')
+                                            ->where('sub_type_name', 'not like', '%foil%')
+                                            ->orderByDesc('updated_at')
+                                            ->first()?->market_price;
+                                        
+                                        // Fallback to edition market_price
+                                        if ($foilPrice === null && $edition->market_price !== null) {
+                                            $foilPrice = $edition->market_price;
+                                        }
+                                        if ($nonFoilPrice === null && $edition->market_price !== null) {
+                                            $nonFoilPrice = $edition->market_price;
+                                        }
+                                    }
+                                }
+                                
+                                // Fallback to card-level prices
+                                if ($foilPrice === null) {
+                                    $foilPrice = $card->cardPrices()
+                                        ->whereNotNull('market_price')
+                                        ->where('sub_type_name', 'like', '%foil%')
+                                        ->orderByDesc('updated_at')
+                                        ->first()?->market_price;
+                                }
+                                
+                                if ($nonFoilPrice === null) {
+                                    $nonFoilPrice = $card->cardPrices()
+                                        ->whereNotNull('market_price')
+                                        ->where('sub_type_name', 'not like', '%foil%')
+                                        ->orderByDesc('updated_at')
+                                        ->first()?->market_price;
+                                }
                             @endphp
-                            @if($marketPrice)
-                                <div class="absolute top-2 right-2 bg-primary-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">
-                                    ${{ number_format($marketPrice, 2) }}
+                            @if($foilPrice || $nonFoilPrice)
+                                <div class="absolute top-2 right-2 flex flex-col gap-1">
+                                    @if($foilPrice)
+                                        <div class="bg-primary-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg" title="TCGPlayer Market Price (Foil)">
+                                            F: ${{ number_format($foilPrice, 2) }}
+                                        </div>
+                                    @endif
+                                    @if($nonFoilPrice)
+                                        <div class="bg-primary-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg" title="TCGPlayer Market Price (Non-Foil)">
+                                            NF: ${{ number_format($nonFoilPrice, 2) }}
+                                        </div>
+                                    @endif
                                 </div>
                             @endif
                         </a>
@@ -153,20 +222,40 @@
     {{-- LIST VIEW: Standard Filament table --}}
     <x-filament-panels::page>
         <div class="space-y-6">
-            {{-- View Mode Switcher --}}
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
-                <div class="flex gap-1">
-                    <button 
-                        wire:click="$set('viewMode', 'grid')"
-                        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'grid' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
-                        Grid
-                    </button>
-                    <button 
-                        wire:click="$set('viewMode', 'list')"
-                        class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'list' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
-                        List
-                    </button>
+            {{-- View Mode Switcher and Edition Selector --}}
+            <div class="flex items-center gap-4 mb-4 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+                    <div class="flex gap-1">
+                        <button 
+                            wire:click="$set('viewMode', 'grid')"
+                            class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'grid' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                            Grid
+                        </button>
+                        <button 
+                            wire:click="$set('viewMode', 'list')"
+                            class="px-4 py-2 text-sm font-medium rounded-md transition-colors {{ $this->viewMode === 'list' ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                            List
+                        </button>
+                    </div>
+                </div>
+                
+                {{-- Edition Selector --}}
+                <div class="flex items-center gap-2">
+                    <label for="edition-select-list" class="text-sm font-medium text-gray-700 dark:text-gray-300">Edition:</label>
+                    <select 
+                        id="edition-select-list"
+                        wire:model.live="selectedEditionId"
+                        class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm focus:border-primary-500 focus:ring-primary-500"
+                    >
+                        <option value="">All Editions</option>
+                        @php
+                            $allEditions = $this->getAvailableEditions();
+                        @endphp
+                        @foreach($allEditions as $edition)
+                            <option value="{{ $edition->id }}">{{ $this->getEditionLabel($edition) }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 

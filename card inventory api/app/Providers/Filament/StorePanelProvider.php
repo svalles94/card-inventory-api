@@ -25,7 +25,7 @@ class StorePanelProvider extends PanelProvider
         return $panel
             ->id('store')
             ->path('store')
-            ->login(\App\Filament\Pages\StoreLogin::class)
+            ->login(\App\Filament\Store\Pages\StoreLogin::class)
             ->brandName('My Store Dashboard')
             ->brandLogo(asset('images/logo.svg'))
             ->brandLogoHeight('2.5rem')

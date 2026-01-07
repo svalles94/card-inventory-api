@@ -41,9 +41,9 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Edition</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Foil</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Location</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market Price</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">TCGPlayer Market</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Buy Price</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Sell Price</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Your Price</th>
                             <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Current Qty</th>
                             <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Change</th>
                             <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">New Qty</th>
@@ -179,13 +179,22 @@
 
                                 <!-- New Sell $ -->
                                 <td class="px-4 py-4">
+                                    @php
+                                        $currentInv = \App\Models\Inventory::where('card_id', $item['card_id'] ?? null)
+                                            ->where('location_id', $item['location_id'] ?? null)
+                                            ->where('is_foil', (bool) ($item['is_foil'] ?? false))
+                                            ->first();
+                                        $currentPrice = $currentInv?->sell_price;
+                                        $placeholder = $currentPrice ? number_format($currentPrice, 2) . ' (current)' : '0.00 (optional)';
+                                    @endphp
                                     <input type="number" 
                                            wire:model="data.items.{{ $index }}.sell_price"
                                            step="0.01"
                                            min="0"
                                            class="bg-white border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                           style="color: #1f2937 !important; background-color: white !important; width: 80px;"
-                                           placeholder="0.00">
+                                           style="color: #1f2937 !important; background-color: white !important; width: 100px;"
+                                           placeholder="{{ $placeholder }}"
+                                           title="{{ $currentPrice ? 'Current price: $' . number_format($currentPrice, 2) . '. Leave empty to keep it.' : 'Optional: Set your selling price' }}">
                                 </td>
 
                                 <!-- New Buy $ -->

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Store\Pages;
 
 use App\Models\MarketplaceIntegration;
 use App\Models\Store;
@@ -25,9 +25,9 @@ class MarketplaceSettings extends Page implements HasForms
     
     protected static ?string $navigationLabel = 'Marketplace Setup';
     
-    protected static ?string $navigationGroup = 'Administration';
+    protected static ?string $navigationGroup = 'Settings';
     
-    protected static string $view = 'filament.pages.marketplace-settings';
+    protected static string $view = 'filament.store.pages.marketplace-settings';
     
     protected static ?int $navigationSort = 4;
     
@@ -236,7 +236,7 @@ class MarketplaceSettings extends Page implements HasForms
         return [
             Action::make('view_integrations')
                 ->label('View All Integrations')
-                ->url(route('filament.admin.resources.marketplace-integrations.index'))
+                ->url(route('filament.store.resources.store-marketplace-integrations.index'))
                 ->icon('heroicon-o-queue-list')
                 ->color('gray'),
         ];

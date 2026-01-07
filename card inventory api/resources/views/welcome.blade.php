@@ -78,7 +78,8 @@
                 @auth
                     <a href="{{ url('/admin') }}" class="btn">Go to Dashboard</a>
                 @else
-                    <a href="{{ url('/admin/login') }}" class="btn">Log In</a>
+                    <a href="{{ url('/admin/login') }}" class="btn">Admin Log In</a>
+                    <a href="{{ route('filament.store.auth.login') }}" class="btn btn-secondary">Store Login</a>
                 @endauth
             </div>
         </div>

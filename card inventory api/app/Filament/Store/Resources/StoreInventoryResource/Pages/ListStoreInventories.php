@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Inventory;
 use App\Models\Location;
 use App\Models\Card;
+use App\Models\Edition;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -28,15 +29,118 @@ class ListStoreInventories extends ListRecords
                 ->label('Download CSV Template')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
+                    $user = Auth::user();
+                    $store = $user->currentStore();
+                    $currentLocation = $user->currentLocation();
+
+                    if (!$store) {
+                        Notification::make()->danger()->title('No store selected')->send();
+                        return;
+                    }
+
                     $headers = [
                         'Content-Type' => 'text/csv',
-                        'Content-Disposition' => 'attachment; filename="inventory-template.csv"',
+                        'Content-Disposition' => 'attachment; filename="inventory-template-' . now()->format('Y-m-d') . '.csv"',
                     ];
 
-                    $callback = function () {
+                    $callback = function () use ($store, $currentLocation) {
                         $output = fopen('php://output', 'w');
-                        fputcsv($output, ['card_number', 'set_code', 'foil', 'quantity', 'sell_price', 'location_name(optional)']);
-                        fputcsv($output, ['123', 'LOR', 'false', '5', '9.99', 'Main Store']);
+                        
+                        // Headers
+                        fputcsv($output, [
+                            'card_name',
+                            'set_code',
+                            'collector_number',
+                            'edition_slug',
+                            'is_foil',
+                            'quantity',
+                            'quantity_mode',
+                            'buy_price',
+                            'sell_price',
+                            'location_name',
+                        ]);
+
+                        // Get all cards from all games (or you could filter by game)
+                        $cards = Card::orderBy('game')->orderBy('name')->get();
+                        $locationId = $currentLocation?->id;
+
+                        foreach ($cards as $card) {
+                            $editions = $card->editions()->orderByDesc('last_update')->get();
+                            
+                            // If no editions, create a row with just the card info
+                            if ($editions->isEmpty()) {
+                                $inventory = null;
+                                if ($locationId) {
+                                    $inventory = Inventory::where('card_id', $card->id)
+                                        ->where('location_id', $locationId)
+                                        ->where('is_foil', false)
+                                        ->first();
+                                }
+                                
+                                fputcsv($output, [
+                                    $card->name,
+                                    $card->set_code ?? '',
+                                    $card->card_number ?? '',
+                                    '', // No edition
+                                    'FALSE',
+                                    $inventory ? $inventory->quantity : '',
+                                    'replace',
+                                    $inventory ? $inventory->buy_price : '',
+                                    $inventory ? $inventory->sell_price : '',
+                                    $currentLocation?->name ?? '',
+                                ]);
+                            } else {
+                                // Add a row for each edition (foil and non-foil)
+                                foreach ($editions as $edition) {
+                                    // Non-foil row
+                                    $inventory = null;
+                                    if ($locationId) {
+                                        $inventory = Inventory::where('card_id', $card->id)
+                                            ->where('edition_id', $edition->id)
+                                            ->where('location_id', $locationId)
+                                            ->where('is_foil', false)
+                                            ->first();
+                                    }
+                                    
+                                    fputcsv($output, [
+                                        $card->name,
+                                        $card->set_code ?? '',
+                                        $edition->collector_number ?? $card->card_number ?? '',
+                                        $edition->slug ?? '',
+                                        'FALSE',
+                                        $inventory ? $inventory->quantity : '',
+                                        'replace',
+                                        $inventory ? $inventory->buy_price : '',
+                                        $inventory ? $inventory->sell_price : '',
+                                        $currentLocation?->name ?? '',
+                                    ]);
+                                    
+                                    // Foil row
+                                    $foilInventory = null;
+                                    if ($locationId) {
+                                        $foilInventory = Inventory::where('card_id', $card->id)
+                                            ->where('edition_id', $edition->id)
+                                            ->where('location_id', $locationId)
+                                            ->where('is_foil', true)
+                                            ->first();
+                                    }
+                                    
+                                    fputcsv($output, [
+                                        $card->name,
+                                        $card->set_code ?? '',
+                                        $edition->collector_number ?? $card->card_number ?? '',
+                                        $edition->slug ?? '',
+                                        'TRUE',
+                                        $foilInventory ? $foilInventory->quantity : '',
+                                        'replace',
+                                        $foilInventory ? $foilInventory->buy_price : '',
+                                        $foilInventory ? $foilInventory->sell_price : '',
+                                        $currentLocation?->name ?? '',
+                                    ]);
+                                }
+                            }
+                        }
+
                         fclose($output);
                     };
 
@@ -52,7 +156,7 @@ class ListStoreInventories extends ListRecords
                         ->acceptedFileTypes(['text/csv', 'text/plain'])
                         ->directory('tmp')
                         ->required()
-                        ->helperText('Columns: card_number, set_code, foil (true/false), quantity, sell_price, location_name(optional)')
+                        ->helperText('CSV format: card_name, set_code, collector_number (optional), edition_slug (optional), is_foil (TRUE/FALSE), quantity, quantity_mode (add/replace), buy_price (optional), sell_price (optional), location_name (optional)')
                         ->maxSize(1024),
                 ])
                 ->action(function (array $data) {
@@ -79,11 +183,11 @@ class ListStoreInventories extends ListRecords
                     }
 
                     $header = fgetcsv($handle);
-                    $required = ['card_number', 'set_code', 'foil', 'quantity', 'sell_price', 'location_name(optional)'];
+                    $required = ['card_name', 'set_code', 'is_foil', 'quantity'];
 
-                    if (! $header || count(array_intersect($required, $header)) < 4) {
+                    if (! $header || count(array_intersect($required, $header)) < count($required)) {
                         fclose($handle);
-                        Notification::make()->danger()->title('CSV header missing required columns')->send();
+                        Notification::make()->danger()->title('CSV header missing required columns')->body('Required: card_name, set_code, is_foil, quantity')->send();
                         return;
                     }
 
@@ -101,29 +205,61 @@ class ListStoreInventories extends ListRecords
                             continue;
                         }
 
-                        $cardNumber = trim($record['card_number'] ?? '');
+                        // Parse required fields
+                        $cardName = trim($record['card_name'] ?? '');
                         $setCode = strtoupper(trim($record['set_code'] ?? ''));
-                        $foil = filter_var($record['foil'] ?? false, FILTER_VALIDATE_BOOLEAN);
-                        $quantity = (int) ($record['quantity'] ?? 0);
-                        $sellPrice = $record['sell_price'] !== '' ? (float) $record['sell_price'] : null;
-                        $locationName = trim($record['location_name(optional)'] ?? '');
+                        $isFoil = filter_var($record['is_foil'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                        $quantity = !empty($record['quantity']) ? (int) $record['quantity'] : null;
+                        $quantityMode = strtolower(trim($record['quantity_mode'] ?? 'add')); // 'add' or 'replace'
+                        
+                        // Optional fields
+                        $collectorNumber = trim($record['collector_number'] ?? '');
+                        $editionSlug = trim($record['edition_slug'] ?? '');
+                        $buyPrice = !empty($record['buy_price']) ? (float) $record['buy_price'] : null;
+                        $sellPrice = !empty($record['sell_price']) ? (float) $record['sell_price'] : null;
+                        $locationName = trim($record['location_name'] ?? '');
 
-                        if (! $cardNumber || ! $setCode || $quantity <= 0) {
+                        if (! $cardName || ! $setCode) {
                             $failed++;
                             continue;
                         }
 
-                        $card = Card::where('card_number', $cardNumber)
-                            ->where('set_code', $setCode)
-                            ->first();
+                        // Find card
+                        $cardQuery = Card::where('name', $cardName)
+                            ->where('set_code', $setCode);
+                        
+                        if ($collectorNumber) {
+                            $cardQuery->where('card_number', $collectorNumber);
+                        }
+                        
+                        $card = $cardQuery->first();
 
                         if (! $card) {
                             $failed++;
                             continue;
                         }
 
-                        $location = $user->currentLocation();
+                        // Find edition if specified
+                        $editionId = null;
+                        if ($editionSlug) {
+                            $edition = $card->editions()
+                                ->where('slug', $editionSlug)
+                                ->first();
+                            if ($edition) {
+                                $editionId = $edition->id;
+                            }
+                        } else {
+                            // Default to latest edition
+                            $latestEdition = $card->editions()
+                                ->orderByDesc('last_update')
+                                ->first();
+                            if ($latestEdition) {
+                                $editionId = $latestEdition->id;
+                            }
+                        }
 
+                        // Determine location
+                        $location = $user->currentLocation();
                         if ($locationName !== '') {
                             $location = $store->locations()->where('name', $locationName)->first();
                         }
@@ -133,16 +269,50 @@ class ListStoreInventories extends ListRecords
                             continue;
                         }
 
+                        // Skip if quantity is empty (allows price-only updates)
+                        if ($quantity === null) {
+                            // Only update prices if provided
+                            if ($buyPrice !== null || $sellPrice !== null) {
+                                $existingInventory = Inventory::where('card_id', $card->id)
+                                    ->where('location_id', $location->id)
+                                    ->where('is_foil', $isFoil)
+                                    ->when($editionId, fn($q) => $q->where('edition_id', $editionId))
+                                    ->first();
+                                
+                                if ($existingInventory) {
+                                    if ($buyPrice !== null) $existingInventory->buy_price = $buyPrice;
+                                    if ($sellPrice !== null) $existingInventory->sell_price = $sellPrice;
+                                    $existingInventory->save();
+                                    $success++;
+                                }
+                            }
+                            continue;
+                        }
+
+                        // Find or create inventory
                         $inventory = Inventory::firstOrNew([
-                            'location_id' => $location->id,
                             'card_id' => $card->id,
-                            'is_foil' => $foil,
+                            'location_id' => $location->id,
+                            'edition_id' => $editionId,
+                            'is_foil' => $isFoil,
                         ]);
 
-                        $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                        // Handle quantity mode
+                        if ($quantityMode === 'add') {
+                            $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                        } else {
+                            // 'replace' mode
+                            $inventory->quantity = $quantity;
+                        }
+
+                        // Update prices if provided
+                        if ($buyPrice !== null) {
+                            $inventory->buy_price = $buyPrice;
+                        }
                         if ($sellPrice !== null) {
                             $inventory->sell_price = $sellPrice;
                         }
+
                         $inventory->save();
                         $success++;
                     }

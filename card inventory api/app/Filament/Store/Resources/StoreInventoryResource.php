@@ -123,21 +123,20 @@ class StoreInventoryResource extends Resource
                         Forms\Components\TextInput::make('sell_price')
                             ->numeric()
                             ->prefix('$')
-                            ->label('Sell Price')
+                            ->label('Your Price')
                             ->helperText('What you sell it for'),
-                        Forms\Components\TextInput::make('market_price')
-                            ->numeric()
-                            ->prefix('$')
-                            ->label('Market Price')
-                            ->helperText('Current market value')
-                            ->default(function (callable $get) {
+                        Forms\Components\Placeholder::make('market_price_display')
+                            ->label('TCGPlayer Market Price')
+                            ->content(function (callable $get) {
                                 $cardId = $get('card_id');
                                 if (! $cardId) {
-                                    return null;
+                                    return 'N/A';
                                 }
 
-                                return static::getLatestMarketPrice($cardId);
-                            }),
+                                $price = static::getLatestMarketPrice($cardId);
+                                return $price ? '$' . number_format($price, 2) : 'N/A';
+                            })
+                            ->helperText('Reference only - from TCGPlayer API'),
                     ])->columns(3),
             ]);
     }
@@ -206,7 +205,7 @@ class StoreInventoryResource extends Resource
                     ->badge(),
                     
                 Tables\Columns\TextColumn::make('sell_price')
-                    ->label('Price')
+                    ->label('Your Price')
                     ->money('USD')
                     ->sortable()
                     ->toggleable()
