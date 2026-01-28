@@ -157,10 +157,21 @@ class StoreInventoryResource extends Resource
                 });
             })
             ->columns([
-                Tables\Columns\ImageColumn::make('card.image')
+                Tables\Columns\ImageColumn::make('image_url')
                     ->label('Image')
-                    ->size(80)
+                    ->height(140) // Tall enough to show full card (2.5:3.5 aspect ratio)
+                    ->width(100)
                     ->defaultImageUrl('/images/card-placeholder.png')
+                    ->getStateUsing(function (Inventory $record) {
+                        // Try edition image first, then card image
+                        if ($record->edition?->image_url) {
+                            return $record->edition->image_url;
+                        }
+                        return $record->card?->image_url;
+                    })
+                    ->url(fn (Inventory $record) => $record->edition?->image_url ?? $record->card?->image_url)
+                    ->openUrlInNewTab()
+                    ->extraAttributes(['style' => 'object-fit: contain;'])
                     ->visibleFrom('md'),
                     
                 Tables\Columns\Layout\Stack::make([

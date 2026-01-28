@@ -65,7 +65,22 @@ class ListStoreInventories extends ListRecords
                         $locationId = $currentLocation?->id;
 
                         foreach ($cards as $card) {
-                            $editions = $card->editions()->orderByDesc('last_update')->get();
+                            // Skip cards without name
+                            if (empty($card->name)) {
+                                continue;
+                            }
+                            
+                            // Get set_code from card, or try to get it from first edition's set
+                            $setCode = $card->set_code;
+                            if (empty($setCode)) {
+                                $firstEdition = $card->editions()->with('set')->first();
+                                if ($firstEdition && $firstEdition->set) {
+                                    // Set model uses 'prefix' field as the set code
+                                    $setCode = $firstEdition->set->prefix ?? '';
+                                }
+                            }
+                            
+                            $editions = $card->editions()->with('set')->orderByDesc('last_update')->get();
                             
                             // If no editions, create a row with just the card info
                             if ($editions->isEmpty()) {
@@ -79,7 +94,7 @@ class ListStoreInventories extends ListRecords
                                 
                                 fputcsv($output, [
                                     $card->name,
-                                    $card->set_code ?? '',
+                                    $setCode ?? '',
                                     $card->card_number ?? '',
                                     '', // No edition
                                     'FALSE',
@@ -92,6 +107,13 @@ class ListStoreInventories extends ListRecords
                             } else {
                                 // Add a row for each edition (foil and non-foil)
                                 foreach ($editions as $edition) {
+                                    // Use set_code from edition's set if card doesn't have it
+                                    $editionSetCode = $setCode;
+                                    if (empty($editionSetCode) && $edition->set) {
+                                        // Set model uses 'prefix' field as the set code
+                                        $editionSetCode = $edition->set->prefix ?? '';
+                                    }
+                                    
                                     // Non-foil row
                                     $inventory = null;
                                     if ($locationId) {
@@ -104,7 +126,7 @@ class ListStoreInventories extends ListRecords
                                     
                                     fputcsv($output, [
                                         $card->name,
-                                        $card->set_code ?? '',
+                                        $editionSetCode ?? '',
                                         $edition->collector_number ?? $card->card_number ?? '',
                                         $edition->slug ?? '',
                                         'FALSE',
@@ -127,7 +149,7 @@ class ListStoreInventories extends ListRecords
                                     
                                     fputcsv($output, [
                                         $card->name,
-                                        $card->set_code ?? '',
+                                        $editionSetCode ?? '',
                                         $edition->collector_number ?? $card->card_number ?? '',
                                         $edition->slug ?? '',
                                         'TRUE',
@@ -153,8 +175,10 @@ class ListStoreInventories extends ListRecords
                 ->form([
                     \Filament\Forms\Components\FileUpload::make('csv')
                         ->label('CSV File')
-                        ->acceptedFileTypes(['text/csv', 'text/plain'])
+                        ->acceptedFileTypes(['text/csv', 'text/plain', 'application/csv'])
+                        ->disk('local')
                         ->directory('tmp')
+                        ->visibility('private')
                         ->required()
                         ->helperText('CSV format: card_name, set_code, collector_number (optional), edition_slug (optional), is_foil (TRUE/FALSE), quantity, quantity_mode (add/replace), buy_price (optional), sell_price (optional), location_name (optional)')
                         ->maxSize(1024),
@@ -169,27 +193,80 @@ class ListStoreInventories extends ListRecords
                     }
 
                     $filePath = $data['csv'];
+                    
+                    // Handle Filament file upload path - try multiple locations
+                    $fullPath = null;
+                    if (str_starts_with($filePath, 'tmp/') || str_starts_with($filePath, 'temp-csv/')) {
+                        $fullPath = Storage::disk('local')->path($filePath);
+                    } else {
+                        // Try local disk first
+                        $fullPath = Storage::disk('local')->path($filePath);
+                        if (!file_exists($fullPath)) {
+                            // Fallback to default storage
                     $fullPath = Storage::path($filePath);
+                        }
+                    }
 
                     if (! file_exists($fullPath)) {
-                        Notification::make()->danger()->title('File not found')->send();
+                        Notification::make()->danger()->title('File not found')->body("Could not locate uploaded file. Please try again.")->send();
                         return;
                     }
 
                     $handle = fopen($fullPath, 'r');
                     if (! $handle) {
-                        Notification::make()->danger()->title('Unable to read file')->send();
+                        Notification::make()->danger()->title('Unable to read file')->body("File exists but cannot be opened. Check file permissions.")->send();
                         return;
                     }
 
                     $header = fgetcsv($handle);
-                    $required = ['card_name', 'set_code', 'is_foil', 'quantity'];
-
-                    if (! $header || count(array_intersect($required, $header)) < count($required)) {
+                    
+                    if (!$header || empty($header)) {
                         fclose($handle);
-                        Notification::make()->danger()->title('CSV header missing required columns')->body('Required: card_name, set_code, is_foil, quantity')->send();
+                        Notification::make()->danger()->title('Invalid CSV file')->body('Could not read CSV headers. Make sure the file is a valid CSV.')->send();
                         return;
                     }
+                    
+                    // Clean headers: trim whitespace, remove BOM, lowercase for comparison
+                    $header = array_map(function($col) {
+                        // Remove BOM if present
+                        $col = preg_replace('/^\xEF\xBB\xBF/', '', $col);
+                        return trim($col);
+                    }, $header);
+                    
+                    // Check if first row looks like a filename instead of headers
+                    $firstHeader = strtolower(trim($header[0] ?? ''));
+                    if (str_contains($firstHeader, '.csv') || 
+                        str_contains($firstHeader, 'template') && count($header) === 1 ||
+                        preg_match('/\d{4}-\d{2}-\d{2}/', $firstHeader) && count($header) === 1) {
+                        fclose($handle);
+                        Notification::make()
+                            ->danger()
+                            ->title('Invalid CSV Format')
+                            ->body("The CSV file appears to have the filename in the first row instead of column headers.\n\nPlease make sure:\n1. The first row contains column names: card_name, set_code, is_foil, quantity\n2. You downloaded the template from the app (not just renamed a file)\n3. The file is saved as a proper CSV (not .txt renamed to .csv)\n\nTry downloading a fresh template from the 'Download CSV Template' button.")
+                            ->send();
+                        return;
+                    }
+                    
+                    $required = ['card_name', 'set_code', 'is_foil', 'quantity'];
+                    $headerLower = array_map('strtolower', $header);
+                    $requiredLower = array_map('strtolower', $required);
+                    
+                    $missing = array_diff($requiredLower, $headerLower);
+                    
+                    if (!empty($missing)) {
+                        fclose($handle);
+                        $foundHeaders = implode(', ', $header);
+                        $missingHeaders = implode(', ', array_map('ucfirst', array_map('str_replace', ['_'], [' '], $missing)));
+                        Notification::make()
+                            ->danger()
+                            ->title('CSV header missing required columns')
+                            ->body("Missing columns: {$missingHeaders}\n\nFound in file: {$foundHeaders}\n\nRequired columns: card_name, set_code, is_foil, quantity\n\nTip: Download a fresh template using the 'Download CSV Template' button to ensure correct format.")
+                            ->send();
+                        return;
+                    }
+                    
+                    // Create a mapping from lowercase headers to actual headers for case-insensitive access
+                    $headerMap = array_combine($headerLower, $header);
 
                     $success = 0;
                     $failed = 0;
@@ -199,13 +276,19 @@ class ListStoreInventories extends ListRecords
                             continue; // skip blank lines
                         }
 
-                        $record = array_combine($header, $row);
-                        if (! $record) {
+                        // Map row to headers (handle case-insensitive)
+                        $record = [];
+                        foreach ($header as $index => $headerName) {
+                            $value = $row[$index] ?? '';
+                            $record[strtolower($headerName)] = $value;
+                        }
+                        
+                        if (empty($record)) {
                             $failed++;
                             continue;
                         }
 
-                        // Parse required fields
+                        // Parse required fields (case-insensitive)
                         $cardName = trim($record['card_name'] ?? '');
                         $setCode = strtoupper(trim($record['set_code'] ?? ''));
                         $isFoil = filter_var($record['is_foil'] ?? false, FILTER_VALIDATE_BOOLEAN);
@@ -299,7 +382,7 @@ class ListStoreInventories extends ListRecords
 
                         // Handle quantity mode
                         if ($quantityMode === 'add') {
-                            $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
+                        $inventory->quantity = ($inventory->quantity ?? 0) + $quantity;
                         } else {
                             // 'replace' mode
                             $inventory->quantity = $quantity;
@@ -318,7 +401,17 @@ class ListStoreInventories extends ListRecords
                     }
 
                     fclose($handle);
+                    
+                    // Clean up uploaded file
+                    try {
+                        if (str_starts_with($filePath, 'tmp/') || str_starts_with($filePath, 'temp-csv/')) {
+                            Storage::disk('local')->delete($filePath);
+                        } else {
                     Storage::delete($filePath);
+                        }
+                    } catch (\Exception $e) {
+                        // Ignore cleanup errors
+                    }
 
                     Notification::make()
                         ->success()

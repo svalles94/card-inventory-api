@@ -24,6 +24,7 @@ class Inventory extends Model
         'market_price',
         'shopify_location_id',
         'shopify_inventory_level_id',
+        'shopify_variant_id',
         'last_synced_at',
         'sync_status',
         'sync_error',

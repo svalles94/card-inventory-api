@@ -30,3 +30,11 @@ Route::get('/store/cards/grid', [\App\Http\Controllers\Store\CardGridController:
 Route::post('/store/cards/add-to-queue', [\App\Http\Controllers\Store\CardGridController::class, 'addToQueue'])
     ->middleware(['auth', 'verified', \App\Http\Middleware\SetCurrentStore::class])
     ->name('store.cards.add-to-queue');
+
+// Shopify OAuth Routes
+Route::get('/shopify/auth', [\App\Http\Controllers\Shopify\ShopifyOAuthController::class, 'initiate'])
+    ->middleware(['auth'])
+    ->name('shopify.oauth.initiate');
+
+Route::get('/shopify/callback', [\App\Http\Controllers\Shopify\ShopifyOAuthController::class, 'callback'])
+    ->name('shopify.oauth.callback');
