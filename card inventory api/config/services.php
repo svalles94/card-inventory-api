@@ -37,4 +37,10 @@ return [
 
     'price_sync_api_base_url' => env('PRICE_SYNC_API_URL', 'https://api.tcgarchitect.com'),
 
+    'shopify' => [
+        'client_id' => env('SHOPIFY_CLIENT_ID'),
+        'client_secret' => env('SHOPIFY_CLIENT_SECRET'),
+        'redirect_uri' => env('SHOPIFY_REDIRECT_URI', env('APP_URL') . '/shopify/callback'),
+    ],
+
 ];

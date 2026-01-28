@@ -87,35 +87,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Quick Actions -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a href="/store/store-inventory-resources/create" 
-                   class="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                    <svg class="h-6 w-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    <div>
-                        <p class="font-medium text-gray-900 dark:text-white">Add Inventory Item</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Add a new card to your inventory</p>
-                    </div>
-                </a>
-
-                <a href="/store/store-location-resources/create" 
-                   class="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                    <svg class="h-6 w-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                    <div>
-                        <p class="font-medium text-gray-900 dark:text-white">Add Location</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Create a new storage location</p>
-                    </div>
-                </a>
-            </div>
-        </div>
     </div>
 </x-filament-panels::page>
 

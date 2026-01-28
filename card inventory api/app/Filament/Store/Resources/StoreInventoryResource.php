@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class StoreInventoryResource extends Resource
 {
@@ -23,9 +24,20 @@ class StoreInventoryResource extends Resource
     
     protected static ?int $navigationSort = 1;
 
+    public static function getLatestMarketPrice(string $cardId): ?float
+    {
+        return Cache::remember("card:{$cardId}:latest_market_price", 300, function () use ($cardId) {
+            return Card::find($cardId)?->cardPrices()
+                ->whereNotNull('market_price')
+                ->orderBy('updated_at', 'desc')
+                ->value('market_price');
+        });
+    }
+
     public static function form(Form $form): Form
     {
         $currentStore = auth()->user()->currentStore();
+        $currentLocationId = auth()->user()->currentLocation()?->id;
         
         if (!$currentStore) {
             return $form->schema([]);
@@ -40,7 +52,9 @@ class StoreInventoryResource extends Resource
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->label('Location'),
+                            ->default($currentLocationId)
+                            ->label('Location')
+                            ->helperText($currentLocationId ? 'Defaulted from your selected location' : 'Pick a location for this inventory item'),
                         Forms\Components\Select::make('card_id')
                             ->relationship('card', 'name')
                             ->required()
@@ -54,7 +68,19 @@ class StoreInventoryResource extends Resource
                                     ->icon('heroicon-o-magnifying-glass')
                                     ->url(\App\Filament\Store\Resources\StoreCardResource::getUrl('index'))
                                     ->openUrlInNewTab()
-                            ),
+                            )
+                            ->reactive()
+                            ->afterStateUpdated(function (callable $set, $state) {
+                                if (! $state) {
+                                    return;
+                                }
+
+                                $latest = static::getLatestMarketPrice($state);
+
+                                if ($latest !== null) {
+                                    $set('market_price', $latest);
+                                }
+                            }),
                     ])->columns(2),
                     
                 Forms\Components\Section::make('Quantity')
@@ -97,13 +123,20 @@ class StoreInventoryResource extends Resource
                         Forms\Components\TextInput::make('sell_price')
                             ->numeric()
                             ->prefix('$')
-                            ->label('Sell Price')
+                            ->label('Your Price')
                             ->helperText('What you sell it for'),
-                        Forms\Components\TextInput::make('market_price')
-                            ->numeric()
-                            ->prefix('$')
-                            ->label('Market Price')
-                            ->helperText('Current market value'),
+                        Forms\Components\Placeholder::make('market_price_display')
+                            ->label('TCGPlayer Market Price')
+                            ->content(function (callable $get) {
+                                $cardId = $get('card_id');
+                                if (! $cardId) {
+                                    return 'N/A';
+                                }
+
+                                $price = static::getLatestMarketPrice($cardId);
+                                return $price ? '$' . number_format($price, 2) : 'N/A';
+                            })
+                            ->helperText('Reference only - from TCGPlayer API'),
                     ])->columns(3),
             ]);
     }
@@ -124,10 +157,21 @@ class StoreInventoryResource extends Resource
                 });
             })
             ->columns([
-                Tables\Columns\ImageColumn::make('card.image')
+                Tables\Columns\ImageColumn::make('image_url')
                     ->label('Image')
-                    ->size(80)
+                    ->height(140) // Tall enough to show full card (2.5:3.5 aspect ratio)
+                    ->width(100)
                     ->defaultImageUrl('/images/card-placeholder.png')
+                    ->getStateUsing(function (Inventory $record) {
+                        // Try edition image first, then card image
+                        if ($record->edition?->image_url) {
+                            return $record->edition->image_url;
+                        }
+                        return $record->card?->image_url;
+                    })
+                    ->url(fn (Inventory $record) => $record->edition?->image_url ?? $record->card?->image_url)
+                    ->openUrlInNewTab()
+                    ->extraAttributes(['style' => 'object-fit: contain;'])
                     ->visibleFrom('md'),
                     
                 Tables\Columns\Layout\Stack::make([
@@ -172,7 +216,7 @@ class StoreInventoryResource extends Resource
                     ->badge(),
                     
                 Tables\Columns\TextColumn::make('sell_price')
-                    ->label('Price')
+                    ->label('Your Price')
                     ->money('USD')
                     ->sortable()
                     ->toggleable()

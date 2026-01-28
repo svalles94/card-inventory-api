@@ -619,20 +619,29 @@
                             <div class="lg:w-2/5 bg-gray-900 p-6 space-y-4 overflow-y-auto">
                                 {{-- Available Editions Dropdown --}}
                                 @if($modalEditions && count($modalEditions) > 0)
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-300 mb-2">
-                                            Available Editions
+                                    <div class="bg-gray-800 rounded-lg p-4 border border-blue-500">
+                                        <label class="block text-sm font-semibold text-white mb-2">
+                                            📚 Select Edition
+                                            @if(count($modalEditions) > 1)
+                                                <span class="text-xs text-gray-400 font-normal">(Price updates automatically)</span>
+                                            @endif
                                         </label>
                                         <select 
                                             x-model="selectedEdition"
-                                            class="w-full rounded-lg border-gray-600 bg-gray-800 text-white"
+                                            x-on:change="$wire.setSelectedEdition($event.target.options[$event.target.selectedIndex].dataset.editionId)"
+                                            class="w-full rounded-lg border-gray-600 bg-gray-700 text-white px-3 py-2 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         >
                                             @foreach($modalEditions as $index => $edition)
-                                                <option value="{{ $index }}">
+                                                <option value="{{ $index }}" data-edition-id="{{ $edition['id'] ?? '' }}">
                                                     {{ $edition['name'] ?? 'Standard Edition' }} #{{ $modalCardData['card_number'] }}
                                                 </option>
                                             @endforeach
                                         </select>
+                                        @if(count($modalEditions) > 1)
+                                            <p class="text-xs text-gray-400 mt-2">
+                                                💡 Changing the edition updates the market price below
+                                            </p>
+                                        @endif
                                     </div>
                                 @endif
 
@@ -808,7 +817,7 @@
                                                             @if($normalPrice)
                                                                 <div class="grid grid-cols-3 gap-2 text-center">
                                                                     <div>
-                                                                        <div class="text-xs text-gray-400 mb-1">Market</div>
+                                                                        <div class="text-xs text-gray-400 mb-1">TCGPlayer Market</div>
                                                                         <div class="text-lg font-bold text-green-400">
                                                                             ${{ number_format($normalPrice['market_price'] ?? 0, 2) }}
                                                                         </div>
@@ -839,7 +848,7 @@
                                                             @if($foilPrice)
                                                                 <div class="grid grid-cols-3 gap-2 text-center">
                                                                     <div>
-                                                                        <div class="text-xs text-gray-400 mb-1">Market</div>
+                                                                        <div class="text-xs text-gray-400 mb-1">TCGPlayer Market</div>
                                                                         <div class="text-lg font-bold text-green-400">
                                                                             ${{ number_format($foilPrice['market_price'] ?? 0, 2) }}
                                                                         </div>
@@ -887,9 +896,9 @@
                                                 <div class="text-3xl font-bold text-blue-400">
                                                     {{ $normalInv['quantity'] ?? 0 }}
                                                 </div>
-                                                @if($normalInv && $normalInv['custom_price'])
+                                                @if($normalInv && $normalInv['sell_price'])
                                                     <div class="text-sm text-green-300 mt-2">
-                                                        Your Price: ${{ number_format($normalInv['custom_price'], 2) }}
+                                                        Your Price: ${{ number_format($normalInv['sell_price'], 2) }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -900,9 +909,9 @@
                                                 <div class="text-3xl font-bold text-yellow-400">
                                                     {{ $foilInv['quantity'] ?? 0 }}
                                                 </div>
-                                                @if($foilInv && $foilInv['custom_price'])
+                                                @if($foilInv && $foilInv['sell_price'])
                                                     <div class="text-sm text-green-300 mt-2">
-                                                        Your Price: ${{ number_format($foilInv['custom_price'], 2) }}
+                                                        Your Price: ${{ number_format($foilInv['sell_price'], 2) }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -936,7 +945,7 @@
                                                 
                                                 @if($marketPrice && !$isFoil)
                                                     <div class="mb-3 text-sm text-center text-gray-400">
-                                                        Market: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
+                                                        TCGPlayer Market Price: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
                                                     </div>
                                                 @endif
 
@@ -1003,7 +1012,7 @@
                                                 
                                                 @if($marketPrice && $isFoil)
                                                     <div class="mb-3 text-sm text-center text-gray-400">
-                                                        Market: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
+                                                        TCGPlayer Market Price: <span class="text-green-400 font-semibold">${{ number_format($marketPrice, 2) }}</span>
                                                     </div>
                                                 @endif
 
@@ -1185,9 +1194,9 @@
                                                         @endif
                                                     </div>
                                                     <div class="text-xs text-gray-400">Card ID: {{ $change['card_id'] ?? $changeKey }}</div>
-                                                    @if(isset($change['custom_price']))
+                                                    @if(isset($change['sell_price']))
                                                         <div class="text-sm text-green-400 mt-1">
-                                                            Price: ${{ number_format($change['custom_price'], 2) }}
+                                                            Your Price: ${{ number_format($change['sell_price'], 2) }}
                                                         </div>
                                                     @endif
                                                 </div>

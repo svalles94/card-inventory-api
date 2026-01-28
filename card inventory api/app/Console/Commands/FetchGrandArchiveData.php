@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use App\Models\Card;
 use App\Models\Set;
@@ -446,10 +445,8 @@ class FetchGrandArchiveData extends Command
 
                     if (isset($cardData['editions']) && is_array($cardData['editions'])) {
                         foreach ($cardData['editions'] as $editionData) {
-                            // Process flip card images for this specific edition (only if not dry run)
-                            if (!$isDryRun) {
-                                $this->processFlipCardImages($editionData);
-                            }
+                            // Note: We don't download images - we just store the URLs
+                            // Images are served directly from the Grand Archive API
                             
                             // Ensure set exists (create if it doesn't)
                             if (!isset($editionData['set'])) {
@@ -617,6 +614,7 @@ class FetchGrandArchiveData extends Command
 
         return [
             'id' => $cardData['uuid'],
+            'game' => 'grand-archive', // Always set game for Grand Archive cards
             'name' => $cardData['name'] ?? null,
             'slug' => $cardData['slug'] ?? null,
             'image' => $image,
@@ -862,62 +860,9 @@ class FetchGrandArchiveData extends Command
         $this->info('=' . str_repeat('=', 60));
     }
 
-    private function processFlipCardImages($editionData)
-    {
-        if (isset($editionData['other_orientations']) && is_array($editionData['other_orientations'])) {
-            foreach ($editionData['other_orientations'] as $orientationData) {
-                if (isset($orientationData['edition']) && 
-                    isset($orientationData['edition']['image'])) {
-                    
-                    $flipImageUrl = $orientationData['edition']['image'];
-                    $flipCardName = $orientationData['name'] ?? 'flip-card';
-                    
-                    try {
-                        $this->downloadCardImage($flipImageUrl, $flipCardName);
-                    } catch (\Exception $e) {
-                        $this->warn("Failed to download flip card image {$flipImageUrl}: " . $e->getMessage());
-                    }
-                }
-            }
-        }
-    }
-
-    private function downloadCardImage($imageUrl, $cardName)
-    {
-        try {
-            // Handle relative URLs by prepending the base URL
-            if (strpos($imageUrl, 'http') !== 0) {
-                $imageUrl = 'https://api.gatcg.com' . $imageUrl;
-            }
-            
-            // Extract filename from URL
-            $filename = basename(parse_url($imageUrl, PHP_URL_PATH));
-            
-            // Clean up the filename
-            $filename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
-            
-            // Check if file already exists in Spaces bucket
-            if (Storage::disk('spaces')->exists("cards/{$filename}")) {
-                return;
-            }
-            
-            // Get the image content
-            $response = Http::timeout(30)->get($imageUrl);
-            
-            if (!$response->successful()) {
-                throw new \Exception("Failed to download image: HTTP {$response->status()}");
-            }
-            
-            // Store in Spaces bucket
-            Storage::disk('spaces')->put("cards/{$filename}", $response->body());
-            
-            $this->line("Downloaded and stored: cards/{$filename}");
-            
-        } catch (\Exception $e) {
-            $this->warn("Error downloading image {$imageUrl}: " . $e->getMessage());
-            throw $e;
-        }
-    }
+    // Removed downloadCardImage and processFlipCardImages methods
+    // We don't need to download images - the app uses URLs directly from the Grand Archive API
+    // This saves storage space and bandwidth, and images are always up-to-date from the source
 
     private function displayFinalSummary()
     {

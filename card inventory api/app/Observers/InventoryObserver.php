@@ -13,16 +13,45 @@ use Illuminate\Support\Facades\Log;
 class InventoryObserver
 {
     /**
+     * Handle the Inventory "created" event.
+     * This fires when a new inventory item is created.
+     */
+    public function created(Inventory $inventory): void
+    {
+        // Sync new inventory to marketplaces
+        $this->syncInventory($inventory);
+    }
+    
+    /**
      * Handle the Inventory "updated" event.
-     * This fires whenever inventory quantity changes.
+     * This fires whenever inventory quantity or prices change.
      */
     public function updated(Inventory $inventory): void
     {
-        // Only sync if quantity actually changed
-        if (!$inventory->wasChanged('quantity')) {
+        // Sync if quantity or prices changed
+        $relevantFields = ['quantity', 'sell_price', 'buy_price'];
+        $hasRelevantChanges = false;
+        
+        foreach ($relevantFields as $field) {
+            if ($inventory->wasChanged($field)) {
+                $hasRelevantChanges = true;
+                break;
+            }
+        }
+        
+        if (!$hasRelevantChanges) {
             return;
         }
         
+        // Sync updated inventory to marketplaces
+        $this->syncInventory($inventory);
+    }
+    
+    /**
+     * Sync inventory to all enabled marketplaces
+     */
+    protected function syncInventory(Inventory $inventory): void
+    {
         // Get store from location
         $store = $inventory->location->store;
         

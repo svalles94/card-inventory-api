@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Store\Pages;
 
 use App\Models\Card;
 use App\Models\Edition;
@@ -20,7 +20,7 @@ class ManageInventory extends Page
     protected static ?string $navigationLabel = 'Manage Inventory';
     protected static ?string $title = 'Manage Inventory';
     protected static ?int $navigationSort = 1;
-    protected static string $view = 'filament.pages.manage-inventory';
+    protected static string $view = 'filament.store.pages.manage-inventory';
     
     // State
     public ?int $selectedLocationId = null;
@@ -46,6 +46,7 @@ class ManageInventory extends Page
     public int $quantityToAdd = 1;
     public int $quantityToRemove = 1;
     public bool $isFoil = false;
+    public ?string $selectedEditionId = null;
     public ?float $customPrice = null;
     public ?float $marketPrice = null;
     
@@ -250,18 +251,17 @@ class ManageInventory extends Page
         
         $this->modalInventory = $card->inventory->toArray();
         
-        // Load custom price if exists
-        $inventory = $card->inventory->first();
-        $this->customPrice = $inventory?->custom_price;
-        
-        // Get market price from first edition's first price
-        $this->marketPrice = null;
+        // Set default edition to first one
         if (!empty($this->modalEditions)) {
-            $firstEdition = $this->modalEditions[0];
-            if (!empty($firstEdition['prices'])) {
-                $this->marketPrice = $firstEdition['prices'][0]['market_price'] ?? null;
-            }
+            $this->selectedEditionId = $this->modalEditions[0]['id'] ?? null;
         }
+        
+        // Load sell price if exists
+        $inventory = $card->inventory->first();
+        $this->customPrice = $inventory?->sell_price;
+        
+        // Calculate initial market price
+        $this->updateMarketPrice();
         
         $this->quantityToAdd = 1;
         $this->quantityToRemove = 1;
@@ -277,6 +277,7 @@ class ManageInventory extends Page
         $this->modalEditions = null;
         $this->modalInventory = null;
         $this->isFoil = false;
+        $this->selectedEditionId = null;
         $this->customPrice = null;
         $this->marketPrice = null;
     }
@@ -284,6 +285,106 @@ class ManageInventory extends Page
     public function setCustomPrice(?float $price): void
     {
         $this->customPrice = $price;
+    }
+    
+    /**
+     * Update market price based on current foil status and selected edition
+     */
+    public function updateMarketPrice(): void
+    {
+        $this->marketPrice = null;
+        
+        if (!$this->modalCardId || empty($this->modalEditions)) {
+            return;
+        }
+        
+        $card = Card::find($this->modalCardId);
+        if (!$card) {
+            return;
+        }
+        
+        // Try to get price from selected edition, or first edition if none selected
+        $editionId = $this->selectedEditionId;
+        if (!$editionId && !empty($this->modalEditions)) {
+            $editionId = $this->modalEditions[0]['id'] ?? null;
+        }
+        
+        if ($editionId) {
+            $edition = \App\Models\Edition::find($editionId);
+            if ($edition) {
+                // Try to get price from card_prices matching foil status
+                $priceQuery = $edition->cardPrices()
+                    ->whereNotNull('market_price')
+                    ->orderByDesc('updated_at');
+                
+                // Filter by foil status
+                if ($this->isFoil) {
+                    $priceQuery->where('sub_type_name', 'like', '%foil%');
+                } else {
+                    $priceQuery->where('sub_type_name', 'not like', '%foil%');
+                }
+                
+                $cardPrice = $priceQuery->first();
+                if ($cardPrice) {
+                    $this->marketPrice = $cardPrice->market_price;
+                    return;
+                }
+                
+                // Fallback to edition's market_price if no card_prices match
+                if ($edition->market_price !== null) {
+                    $this->marketPrice = $edition->market_price;
+                    return;
+                }
+            }
+        }
+        
+        // Fallback to card-level prices
+        $cardPriceQuery = $card->cardPrices()
+            ->whereNotNull('market_price')
+            ->orderByDesc('updated_at');
+        
+        if ($this->isFoil) {
+            $cardPriceQuery->where('sub_type_name', 'like', '%foil%');
+        } else {
+            $cardPriceQuery->where('sub_type_name', 'not like', '%foil%');
+        }
+        
+        $cardPrice = $cardPriceQuery->first();
+        if ($cardPrice) {
+            $this->marketPrice = $cardPrice->market_price;
+        }
+    }
+    
+    /**
+     * Toggle foil status and update market price
+     */
+    public function updatedIsFoil(): void
+    {
+        $this->updateMarketPrice();
+        
+        // Also update custom price if it was based on market price
+        if ($this->marketPrice && $this->customPrice) {
+            // Optionally keep the same percentage adjustment
+            // Or just reset to market price
+            // For now, we'll leave custom price as is
+        }
+    }
+    
+    /**
+     * Set selected edition and update market price
+     */
+    public function setSelectedEdition(?string $editionId): void
+    {
+        $this->selectedEditionId = $editionId;
+        $this->updateMarketPrice();
+    }
+    
+    /**
+     * Update market price when edition changes
+     */
+    public function updatedSelectedEditionId(): void
+    {
+        $this->updateMarketPrice();
     }
     
     public function applyPricePercentage(int $percentage): void
@@ -353,9 +454,9 @@ class ManageInventory extends Page
         
         $this->pendingChanges[$changeKey]['change'] += $this->quantityToAdd;
         
-        // Include custom price if set
+        // Include sell price if set
         if ($this->customPrice !== null) {
-            $this->pendingChanges[$changeKey]['custom_price'] = $this->customPrice;
+            $this->pendingChanges[$changeKey]['sell_price'] = $this->customPrice;
         }
         
         // Force Livewire to detect the change
@@ -462,9 +563,9 @@ class ManageInventory extends Page
                 'quantity' => $newQty,
             ];
             
-            // Include custom price if it was set
-            if (isset($change['custom_price'])) {
-                $updateData['custom_price'] = $change['custom_price'];
+            // Include sell price if it was set
+            if (isset($change['sell_price'])) {
+                $updateData['sell_price'] = $change['sell_price'];
             }
             
             Inventory::updateOrCreate(

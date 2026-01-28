@@ -181,9 +181,15 @@ class TcgPlayerInventorySync
     {
         $strategy = $this->integration->settings['pricing_strategy'] ?? 'market';
         
+        // Get market price from card_prices, not inventory
+        $marketPrice = $inventory->card->cardPrices()
+            ->whereNotNull('market_price')
+            ->orderByDesc('updated_at')
+            ->value('market_price');
+        
         return match($strategy) {
-            'market' => $inventory->market_price ?? $inventory->sell_price ?? 0,
-            'below_market' => ($inventory->market_price ?? 0) * 0.95,
+            'market' => $marketPrice ?? $inventory->sell_price ?? 0,
+            'below_market' => ($marketPrice ?? 0) * 0.95,
             'fixed' => $inventory->sell_price ?? 0,
             default => $inventory->sell_price ?? 0,
         };

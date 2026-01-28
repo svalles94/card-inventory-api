@@ -15,6 +15,7 @@ class Inventory extends Model
     protected $fillable = [
         'location_id',
         'card_id',
+        'edition_id',
         'is_foil',
         'quantity',
         'custom_price',
@@ -23,6 +24,7 @@ class Inventory extends Model
         'market_price',
         'shopify_location_id',
         'shopify_inventory_level_id',
+        'shopify_variant_id',
         'last_synced_at',
         'sync_status',
         'sync_error',
@@ -42,12 +44,18 @@ class Inventory extends Model
     {
         return [
             'card_id' => 'string',
+            'edition_id' => 'string',
             'is_foil' => 'boolean',
             'buy_price' => 'decimal:2',
             'sell_price' => 'decimal:2',
             'market_price' => 'decimal:2',
             'last_synced_at' => 'datetime',
         ];
+    }
+
+    public function edition(): BelongsTo
+    {
+        return $this->belongsTo(Edition::class, 'edition_id', 'id');
     }
 }
 
