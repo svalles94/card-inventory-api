@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use Filament\Http\Middleware\Authenticate;
+use Illuminate\Support\Facades\Vite;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -26,6 +27,7 @@ class StorePanelProvider extends PanelProvider
             ->id('store')
             ->path('store')
             ->login(\App\Filament\Store\Pages\StoreLogin::class)
+            ->renderHook('panels::head.start', fn (): string => Vite::with(['resources/css/app.css', 'resources/js/app.js'])->toHtml())
             ->brandName('My Store Dashboard')
             ->brandLogo(asset('images/logo.svg'))
             ->brandLogoHeight('2.5rem')
