@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
+use Illuminate\Support\Facades\Blade;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages;
@@ -27,6 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(\App\Filament\Pages\CustomLogin::class)
+            ->renderHook('panels::head.start', fn (): string => Blade::render('@vite([\'resources/css/app.css\', \'resources/js/app.js\'])'))
             ->brandName('Inventory Architect')
             ->brandLogo(asset('images/logo.svg'))
             ->brandLogoHeight('2.5rem')
